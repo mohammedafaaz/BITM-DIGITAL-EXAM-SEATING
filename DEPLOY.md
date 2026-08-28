@@ -85,7 +85,7 @@ HTTPS by default, no server to maintain.
 Open your deployed URL and check, in order:
 1. Home page loads (no "Backend not configured" message — if you see that,
    double check step 2).
-2. Log in as admin with `AdminBitm@2026`.
+2. Open the admin login and create the first admin password when prompted.
 3. Add a room, add a course, upload a sample CSV, generate seating.
 4. Refresh the page — your room/course should still be there (confirms
    Supabase is actually persisting data, not just working in-memory).
@@ -106,8 +106,11 @@ Open your deployed URL and check, in order:
   but it is not real access control. If you ever need that, it means adding
   server-side auth (e.g. Supabase Auth + RLS keyed to a logged-in admin
   user), which is a bigger change than this deployment.
-- **Changing the admin password.** It's hardcoded in `seating.html` as
-  `ADMIN_PASSWORD`. To change it, edit that line and redeploy.
+- **Admin password.** On the first admin login, create a password in the app.
+   Admins can later change it from **Overview → Update admin password**. The
+   app stores only a salted password hash in Supabase, not the plaintext
+   password. Because the current `kv_store` policy is public, this remains a
+   browser-level deterrent rather than real server-side access control.
 - **Free tier limits.** Supabase's free plan includes 500MB database storage
   and a generous request allowance — this app's data (room/course/seating
   records) is tiny (kilobytes to low megabytes even at hundreds of students),

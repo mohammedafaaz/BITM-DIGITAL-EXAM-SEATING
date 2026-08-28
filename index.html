@@ -352,7 +352,7 @@ var ADMISSION_YEARS = (function(){
 var ROOMS = [];      // {id, block, roomNumber, rows, cols, perBench, status}
 var COURSES = [];    // {id, name, code, branches[], date, session, year}
 var CUSTOM_BATCHES = []; // additional admission-year codes added manually by admin
-var ADMIN_PASSWORD = "AdminBitm@2026"; // fixed admin password (not stored / not changeable in-app)
+var ADMIN_PASSWORD_HASH = null;
 var ASSIGN_CACHE = {};   // courseId -> assignment object (or null), refreshed on demand
 var FAILED_LOGIN_COUNT = 0;
 var LOCK_UNTIL_TS = 0;
@@ -375,6 +375,9 @@ var S = {
   studentUsn: '',
   loginError: '',
   adminLoginError: '',
+  adminSetupError: '',
+  passwordUpdateError: '',
+  passwordUpdateSuccess: '',
   selectedBlock: BLOCKS[0],
   roomViewBlock: 'all',
   editingRoomId: '',
@@ -425,6 +428,27 @@ function formatTime12(t){
   var ampm = h>=12 ? 'PM' : 'AM';
   var h12 = h % 12; if(h12===0) h12 = 12;
   return h12+':'+min+' '+ampm;
+}
+async function hashAdminPassword(password, salt){
+  var encoded = new TextEncoder().encode(salt+'\n'+password);
+  var digest = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(digest)).map(function(byte){return byte.toString(16).padStart(2,'0');}).join('');
+}
+function randomPasswordSalt(){
+  var bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map(function(byte){return byte.toString(16).padStart(2,'0');}).join('');
+}
+async function verifyAdminPassword(password){
+  if(!ADMIN_PASSWORD_HASH || !ADMIN_PASSWORD_HASH.salt || !ADMIN_PASSWORD_HASH.hash) return false;
+  return (await hashAdminPassword(password, ADMIN_PASSWORD_HASH.salt))===ADMIN_PASSWORD_HASH.hash;
+}
+async function saveAdminPassword(password){
+  var record = { salt: randomPasswordSalt() };
+  record.hash = await hashAdminPassword(password, record.salt);
+  var ok = await storageSetSafe('adminPasswordHash', JSON.stringify(record), true);
+  if(ok) ADMIN_PASSWORD_HASH = record;
+  return ok;
 }
 function examStatus(course){
   if(!course || !course.date || !course.time) return null;
@@ -479,7 +503,11 @@ async function loadAll(){
     CUSTOM_BATCHES = cb && cb.value ? JSON.parse(cb.value) : [];
   }catch(e){ CUSTOM_BATCHES = []; }
   try{
-    if(localStorage.getItem('adminRemember')==='1'){ S.isAdmin = true; S.screen = 'adminDashboard'; S.adminTab = 'overview'; }
+    var ap = await window.storage.get('adminPasswordHash', true);
+    ADMIN_PASSWORD_HASH = ap && ap.value ? JSON.parse(ap.value) : null;
+  }catch(e){ ADMIN_PASSWORD_HASH = null; }
+  try{
+    if(ADMIN_PASSWORD_HASH && localStorage.getItem('adminRemember')==='1'){ S.isAdmin = true; S.screen = 'adminDashboard'; S.adminTab = 'overview'; }
   }catch(e){ /* not remembered */ }
   DATA_READY = true;
 }
@@ -550,7 +578,33 @@ function topbarHTML(){
   } else if(S.screen!=='home'){
     right = '<button class="linklike" onclick="App.goHome()">&larr; Home</button>';
   }
+  return '' +/* ---------------- topbar ---------------- */
+function topbarHTML(){
+  var right = '';
+
+  if(S.isAdmin){
+    right = '<span class="tag">ADMIN SESSION</span>' +
+            '<button class="linklike" onclick="App.adminLogout()">Log out</button>';
+  } else if(S.screen !== 'home'){
+    right = '<button class="linklike" onclick="App.goHome()">&larr; Home</button>';
+  }
+
   return '' +
+  '<div class="topbar">' +
+
+    '<div class="brand" onclick="App.goHome()">' +
+
+      '<img src="images/bitm-logo.png" ' +
+      'alt="BITM Logo" class="bitm-logo">' +
+
+      '<span class="name">BITM Digital Exam Seating</span>' +
+
+    '</div>' +
+
+    '<div class="top-actions">' + right + '</div>' +
+
+  '</div>';
+}
   '<div class="topbar">' +
     '<div class="brand" onclick="App.goHome()">' +
       '<span class="name">BITM Digital Exam Seating</span>' +
@@ -670,6 +724,7 @@ function roomGridHTML(room, highlight){
 
 /* ---------------- admin login ---------------- */
 function adminLoginHTML(){
+  if(!ADMIN_PASSWORD_HASH) return adminSetupHTML();
   var locked = Date.now() < LOCK_UNTIL_TS;
   return '' +
   '<div class="wrap narrow">' +
@@ -685,6 +740,19 @@ function adminLoginHTML(){
         '<input type="checkbox" id="adminRememberMe" checked style="width:auto;"> Remember me on this device' +
       '</label>' +
       '<button class="btn btn-stamp btn-block" '+(locked?'disabled':'')+' onclick="App.adminSubmit()">Log in</button>' +
+    '</div>' +
+  '</div>';
+}
+function adminSetupHTML(){
+  return '' +
+  '<div class="wrap narrow">' +
+    '<h2>Create admin password</h2>' +
+    '<p class="lead" style="margin-bottom:22px;">Set the password for the examination cell administrator before using the dashboard.</p>' +
+    (S.adminSetupError ? '<div class="error-msg">'+esc(S.adminSetupError)+'</div>' : '') +
+    '<div class="card">' +
+      '<div class="field"><label for="newAdminPass">New admin password</label><input id="newAdminPass" type="password" minlength="8" autocomplete="new-password"></div>' +
+      '<div class="field"><label for="confirmAdminPass">Confirm admin password</label><input id="confirmAdminPass" type="password" minlength="8" autocomplete="new-password"></div>' +
+      '<button class="btn btn-stamp btn-block" onclick="App.createAdminPassword()">Create password</button>' +
     '</div>' +
   '</div>';
 }
@@ -719,6 +787,17 @@ function overviewTabHTML(){
     '<div class="stat"><div class="n">'+totalCapacity+'</div><div class="l">Total seat capacity</div></div>' +
     '<div class="stat"><div class="n">'+COURSES.length+'</div><div class="l">Courses configured</div></div>' +
     '<div class="stat"><div class="n">'+published+'</div><div class="l">Courses with seating published</div></div>' +
+  '</div>' +
+  '<div class="card">' +
+    '<h3>Update admin password</h3>' +
+    (S.passwordUpdateError ? '<div class="error-msg">'+esc(S.passwordUpdateError)+'</div>' : '') +
+    (S.passwordUpdateSuccess ? '<div class="ok-msg">'+esc(S.passwordUpdateSuccess)+'</div>' : '') +
+    '<div class="row">' +
+      '<div class="field"><label for="currentAdminPass">Current password</label><input id="currentAdminPass" type="password" autocomplete="current-password"></div>' +
+      '<div class="field"><label for="updatedAdminPass">New password</label><input id="updatedAdminPass" type="password" minlength="8" autocomplete="new-password"></div>' +
+      '<div class="field"><label for="confirmUpdatedAdminPass">Confirm new password</label><input id="confirmUpdatedAdminPass" type="password" minlength="8" autocomplete="new-password"></div>' +
+    '</div>' +
+    '<button class="btn btn-ghost" onclick="App.updateAdminPassword()">Update password</button>' +
   '</div>' +
   '<div class="card">' +
     '<button class="btn btn-danger" onclick="App.resetAll()">Reset all data</button>' +
@@ -1128,6 +1207,17 @@ var App = {
     render();
   },
 
+  createAdminPassword: async function(){
+    var password = (document.getElementById('newAdminPass').value||'');
+    var confirmation = (document.getElementById('confirmAdminPass').value||'');
+    if(password.length<8){ S.adminSetupError = 'Password must be at least 8 characters.'; render(); return; }
+    if(password!==confirmation){ S.adminSetupError = 'Passwords do not match.'; render(); return; }
+    var ok = await saveAdminPassword(password);
+    if(!ok){ S.adminSetupError = 'Could not save the password — please try again.'; render(); return; }
+    S.adminSetupError = '';
+    S.adminLoginError = '';
+    render();
+  },
   adminSubmit: async function(){
     if(Date.now() < LOCK_UNTIL_TS){
       S.adminLoginError = 'Too many failed attempts. Please wait a moment and try again.';
@@ -1136,7 +1226,7 @@ var App = {
     }
     var el = document.getElementById('adminPass');
     var pass = el ? el.value : '';
-    if(pass !== ADMIN_PASSWORD){
+    if(!(await verifyAdminPassword(pass))){
       FAILED_LOGIN_COUNT++;
       if(FAILED_LOGIN_COUNT >= 5){
         LOCK_UNTIL_TS = Date.now() + 30000;
@@ -1159,6 +1249,20 @@ var App = {
       else{ localStorage.removeItem('adminRemember'); }
     }catch(e){ /* localStorage unavailable — remember-me just won't persist */ }
     await refreshAssignCache();
+    render();
+  },
+  updateAdminPassword: async function(){
+    S.passwordUpdateError = '';
+    S.passwordUpdateSuccess = '';
+    var current = document.getElementById('currentAdminPass').value||'';
+    var updated = document.getElementById('updatedAdminPass').value||'';
+    var confirmation = document.getElementById('confirmUpdatedAdminPass').value||'';
+    if(!(await verifyAdminPassword(current))){ S.passwordUpdateError = 'Current password is incorrect.'; render(); return; }
+    if(updated.length<8){ S.passwordUpdateError = 'New password must be at least 8 characters.'; render(); return; }
+    if(updated!==confirmation){ S.passwordUpdateError = 'New passwords do not match.'; render(); return; }
+    var ok = await saveAdminPassword(updated);
+    if(!ok){ S.passwordUpdateError = 'Could not save the new password — please try again.'; render(); return; }
+    S.passwordUpdateSuccess = 'Admin password updated successfully.';
     render();
   },
   adminLogout: function(){

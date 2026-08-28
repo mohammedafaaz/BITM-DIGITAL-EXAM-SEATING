@@ -22,15 +22,11 @@ create trigger kv_store_touch_trigger
   for each row execute function kv_store_touch();
 
 -- Row Level Security
--- This app has no real user accounts — the admin dashboard is gated only by
--- a client-side password check in the page itself, exactly like the original
--- Claude-artifact version. Because of that, the same public anon key that
--- lets the app read/write data would also let anyone with the key bypass the
--- admin screen and write directly. That is a limitation of the app's design,
--- not something this schema can close — treat the admin password as a soft
--- deterrent for a low-stakes internal tool, not real access control. If you
--- need real protection, the fix is a server-side auth layer, which is a
--- bigger change than this deployment covers.
+-- The app stores a salted admin password hash in this table and verifies it
+-- in the browser. Because the anon policy below is public, anyone with the
+-- anon key could still bypass the page and write directly. This password is
+-- therefore a browser-level deterrent, not real server-side access control.
+-- Real protection requires Supabase Auth plus RLS policies for admin users.
 alter table kv_store enable row level security;
 
 drop policy if exists "public full access" on kv_store;
