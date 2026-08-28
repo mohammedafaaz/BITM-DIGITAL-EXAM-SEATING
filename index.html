@@ -329,6 +329,16 @@ window.storage = {
 /* ---------------- constants ---------------- */
 var BLOCKS = ["Admin Block","Millenium Block","Electrical Block","Data Science Block","Silver Jubilee Block","CV Raman Block"];
 var BRANCHES = ["AI","CS","ME","CV","CD","CA","EE","EC"];
+var ACADEMIC_BRANCHES = [
+  {code:"AIML", name:"Artificial Intelligence & Machine Learning"},
+  {code:"CSE", name:"Computer Science"},
+  {code:"CS-DS", name:"Data Science"},
+  {code:"CS-AI", name:"Artificial Intelligence"},
+  {code:"ME", name:"Mechanical Engineering"},
+  {code:"EEE", name:"Electrical & Electronics Engineering"},
+  {code:"ECE", name:"Electronics Engineering"},
+  {code:"CIVIL", name:"Civil Engineering"}
+];
 var USN_RE = /^3BR(\d{2})([A-Z]{2})(\d{3})$/;
 var CURRENT_YEAR_2D = new Date().getFullYear() % 100;
 var ADMISSION_YEARS = (function(){
@@ -396,6 +406,10 @@ function getBranch(usn){
 function getYear(usn){
   var m = String(usn||'').toUpperCase().trim().match(USN_RE);
   return m ? m[1] : null;
+}
+function academicBranchName(code){
+  var branch = ACADEMIC_BRANCHES.find(function(item){return item.code===code;});
+  return branch ? branch.name : code;
 }
 function isValidUSN(usn){ return !!getBranch(usn); }
 function roomById(id){ return ROOMS.find(function(r){return r.id===id;}); }
@@ -596,13 +610,13 @@ function slipHTML(slip){
   '<div class="slip">' +
     '<div class="slip-head">' +
       '<div><div class="course">'+esc(course.name)+'</div><div class="code">'+esc(course.code)+(course.date?(' &middot; '+esc(course.date)):'')+' &middot; '+esc(sessionLabel(course.session))+(course.time?(' &middot; '+esc(formatTime12(course.time))):'')+'</div></div>' +
-      '<div class="code">'+esc(slip.branch)+'</div>' +
+      '<div class="code">'+esc(academicBranchName(slip.branch))+'</div>' +
     '</div>' +
     '<div class="slip-body">' +
       '<div class="slip-grid">' +
         (slip.name ? '<div class="slip-field"><div class="k">Name</div><div class="v">'+esc(slip.name)+'</div></div>' : '') +
         '<div class="slip-field"><div class="k">USN</div><div class="v mono">'+esc(slip.usn)+'</div></div>' +
-        '<div class="slip-field"><div class="k">Branch / Batch</div><div class="v mono">'+esc(slip.branch)+' &middot; 20'+esc(course.year)+'</div></div>' +
+        '<div class="slip-field"><div class="k">Branch / Batch</div><div class="v">'+esc(academicBranchName(slip.branch))+' &middot; 20'+esc(course.year)+'</div></div>' +
         '<div class="slip-field"><div class="k">Session</div><div class="v">'+esc(sessionLabel(course.session))+'</div></div>' +
         '<div class="slip-field"><div class="k">Reporting time</div><div class="v mono">'+esc(formatTime12(course.time)||'—')+'</div></div>' +
         '<div class="slip-field"><div class="k">Block</div><div class="v">'+esc(room?room.block:'—')+'</div></div>' +
@@ -707,8 +721,11 @@ function roomsTabHTML(){
     '<select onchange="App.setRoomViewBlock(this.value)">' + blockOpts + '</select>' +
   '</div>' +
   '<div class="card">' +
-    '<h3>Add room to '+esc(S.selectedBlock)+'</h3>' +
+    '<h3>Add room</h3>' +
     (S.roomFormError ? '<div class="error-msg">'+esc(S.roomFormError)+'</div>' : '') +
+    '<div class="field"><label>Block</label><select onchange="App.setBlock(this.value)">' +
+      BLOCKS.map(function(block){return '<option value="'+esc(block)+'"'+(block===S.selectedBlock?' selected':'')+'>'+esc(block)+'</option>';}).join('') +
+    '</select><div class="hint">New room will be added to the selected block.</div></div>' +
     '<div class="row">' +
       '<div class="field"><label>Floor number</label><input id="roomFloor" type="text" placeholder="e.g. 1"></div>' +
       '<div class="field"><label>Room number</label><input id="roomNumber" type="text" placeholder="e.g. 204"></div>' +
@@ -781,9 +798,10 @@ function roomEditHTML(r){
 }
 
 function coursesTabHTML(){
-  var branchChips = BRANCHES.map(function(b){
+  var branchChips = ACADEMIC_BRANCHES.map(function(branch){
+    var b = branch.code;
     var checked = !!S.courseBranchSel[b];
-    return '<label class="chip'+(checked?' checked':'')+'"><input type="checkbox" '+(checked?'checked':'')+' onchange="App.toggleCourseBranch(&#39;'+b+'&#39;)"> '+b+'</label>';
+    return '<label class="chip'+(checked?' checked':'')+'"><input type="checkbox" '+(checked?'checked':'')+' onchange="App.toggleCourseBranch(&#39;'+b+'&#39;)"> '+esc(branch.code)+'</label>';
   }).join('');
   var years = allBatchYears();
   if(years.indexOf(S.courseForm.year)===-1) S.courseForm.year = years[0];
@@ -896,6 +914,7 @@ function seatingTabHTML(){
           '<div class="row" style="gap:8px;">' +
             '<input id="addStudentUsn" type="text" maxlength="10" placeholder="3BR24AI099" style="font-family:var(--font-mono); text-transform:uppercase;">' +
             '<input id="addStudentName" type="text" placeholder="Student name (optional)">' +
+            '<select id="addStudentBranch" aria-label="Academic branch">'+course.branches.map(function(branch){return '<option value="'+esc(branch)+'">'+esc(branch)+'</option>';}).join('')+'</select>' +
             '<button class="btn btn-stamp btn-sm" onclick="App.addStudentToSeating()">Add</button>' +
           '</div>' +
           '<div class="hint">Slots this USN into the next free seat in the rooms already allotted &mdash; no reshuffle.</div>' +
@@ -1000,12 +1019,11 @@ function processBranchRows(rows, course, expectedBranch){
     var branch = getBranch(usn);
     var year = getYear(usn);
     if(!branch){ invalid.push(usn); return; }
-    if(branch !== expectedBranch){ wrongBranch.push(usn); wrongBranchSet[branch] = true; return; }
     if(course.year && year !== course.year){ outOfYear.push(usn); return; }
     valid.push(usn);
     names[usn] = nameRaw!=null ? String(nameRaw).trim() : '';
   });
-  return { valid: valid, invalid: invalid, wrongBranch: wrongBranch, outOfYear: outOfYear, wrongBranchSet: Object.keys(wrongBranchSet), names: names };
+  return { valid: valid, invalid: invalid, wrongBranch: [], outOfYear: outOfYear, wrongBranchSet: [], names: names };
 }
 
 /* ---------------- seating algorithm ---------------- */
@@ -1041,8 +1059,9 @@ function runSeatingAlgorithm(course, strategy, roomIds, csvParsed){
       for(var c=1; c<=room.cols && idx<ordered.length; c++){
         for(var s=1; s<=room.perBench && idx<ordered.length; s++){
           var usn = ordered[idx++];
-          seatMap[usn] = { roomId: room.id, row:r, col:c, seat:s };
-          rows.push({ usn: usn, branch: getBranch(usn), roomLabel: room.block+' — Room '+room.roomNumber, row:r, col:c, seat:s });
+          var academicBranch = csvParsed.branchByUsn[usn] || getBranch(usn);
+          seatMap[usn] = { roomId: room.id, row:r, col:c, seat:s, academicBranch: academicBranch };
+          rows.push({ usn: usn, branch: academicBranch, roomLabel: room.block+' — Room '+room.roomNumber, row:r, col:c, seat:s });
         }
       }
     }
@@ -1061,7 +1080,7 @@ async function findStudentSlips(usn){
     var seat = assign.seatMap[usn];
     var room = roomById(seat.roomId);
     var studentName = (assign.names && assign.names[usn]) || '';
-    slips.push({ usn: usn, name: studentName, branch: getBranch(usn), course: course, room: room, seat: seat });
+    slips.push({ usn: usn, name: studentName, branch: seat.academicBranch || getBranch(usn), course: course, room: room, seat: seat });
   }
   return slips;
 }
@@ -1304,7 +1323,7 @@ var App = {
     var roomIds = Object.keys(S.selectedRoomIds).filter(function(id){return S.selectedRoomIds[id];});
     if(roomIds.length===0) return;
 
-    var combined = { valid: [], byBranch: {}, names: {} };
+    var combined = { valid: [], byBranch: {}, branchByUsn: {}, names: {} };
     var ready = course.branches.length>0;
     course.branches.forEach(function(b){
       var entry = S.csvFiles[b];
@@ -1312,6 +1331,7 @@ var App = {
       if(!res || res.wrongBranch.length>0 || res.valid.length===0){ ready = false; return; }
       combined.byBranch[b] = res.valid.slice();
       combined.valid = combined.valid.concat(res.valid);
+      res.valid.forEach(function(usn){ combined.branchByUsn[usn] = b; });
       Object.keys(res.names||{}).forEach(function(usn){ combined.names[usn] = res.names[usn]; });
     });
     if(!ready || combined.valid.length===0) return;
@@ -1376,13 +1396,15 @@ var App = {
     if(!course || !res || res.courseId !== course.id) return;
     var el = document.getElementById('addStudentUsn');
     var nameEl = document.getElementById('addStudentName');
+    var branchEl = document.getElementById('addStudentBranch');
     var usn = (el ? el.value : '').trim().toUpperCase();
     var studentName = (nameEl ? nameEl.value : '').trim();
+    var academicBranch = branchEl ? branchEl.value : course.branches[0];
     if(!isValidUSN(usn)){ S.addStudentError = 'Not a valid USN.'; render(); return; }
     var branch = getBranch(usn);
     var year = getYear(usn);
     if(course.year && year !== course.year){ S.addStudentError = 'This USN is not from the 20'+course.year+' batch set for this course.'; render(); return; }
-    if(course.branches.indexOf(branch)===-1){ S.addStudentError = 'This USN\'s branch ('+branch+') is not selected for this course.'; render(); return; }
+    if(course.branches.indexOf(academicBranch)===-1){ S.addStudentError = 'Select an academic branch for this student.'; render(); return; }
 
     var assign = await getAssignment(course.id);
     if(!assign) assign = { seatMap:{}, names:{}, roomsUsed: res.roomsUsed, generatedAt: new Date().toISOString() };
@@ -1412,13 +1434,13 @@ var App = {
     }
     if(!placed){ S.addStudentError = 'No free seat left in the rooms allotted to this course. Add another room first.'; render(); return; }
 
-    assign.seatMap[usn] = { roomId: placed.roomId, row: placed.row, col: placed.col, seat: placed.seat };
+    assign.seatMap[usn] = { roomId: placed.roomId, row: placed.row, col: placed.col, seat: placed.seat, academicBranch: academicBranch };
     if(studentName) assign.names[usn] = studentName;
     var ok = await saveAssignment(course.id, assign);
     if(!ok){ S.addStudentError = 'Could not save — please try again.'; render(); return; }
     ASSIGN_CACHE[course.id] = assign;
     res.seatedCount++;
-    res.rows.push({ usn: usn, name: studentName, branch: branch, roomLabel: placed.roomLabel, row: placed.row, col: placed.col, seat: placed.seat });
+    res.rows.push({ usn: usn, name: studentName, branch: academicBranch, roomLabel: placed.roomLabel, row: placed.row, col: placed.col, seat: placed.seat });
     res.unseated = (res.unseated||[]).filter(function(u){return u!==usn;});
     if(el) el.value = '';
     if(nameEl) nameEl.value = '';
