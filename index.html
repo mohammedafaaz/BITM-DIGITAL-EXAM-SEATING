@@ -664,7 +664,7 @@ function adminDashboardHTML(){
   else if(S.adminTab==='courses') body = coursesTabHTML();
   else if(S.adminTab==='seating') body = seatingTabHTML();
 
-  return '<div class="wrap"><span class="eyebrow">Exam cell</span><h2 style="margin-bottom:18px;">Admin dashboard</h2>' + tabBar + body + '</div>';
+  return '<div class="wrap"><h2 style="margin-bottom:18px;">Admin dashboard</h2>' + tabBar + body + '</div>';
 }
 
 function overviewTabHTML(){
@@ -679,8 +679,6 @@ function overviewTabHTML(){
     '<div class="stat"><div class="n">'+published+'</div><div class="l">Courses with seating published</div></div>' +
   '</div>' +
   '<div class="card">' +
-    '<h3>Reset all data</h3>' +
-    '<p class="hint" style="margin-bottom:14px;">Wipes every room, course and published seating for the whole college. This cannot be undone.</p>' +
     '<button class="btn btn-danger" onclick="App.resetAll()">Reset all data</button>' +
   '</div>';
 }
@@ -763,12 +761,10 @@ function coursesTabHTML(){
     '<h3>Admission batches</h3>' +
     (S.newBatchError ? '<div class="error-msg">'+esc(S.newBatchError)+'</div>' : '') +
     '<div class="field">' +
-      '<label>Add a new batch (2-digit admission year code)</label>' +
       '<div style="display:flex; gap:8px;">' +
         '<input id="newBatchInput" type="text" maxlength="2" placeholder="e.g. 27" value="'+esc(S.newBatchValue)+'" style="font-family:var(--font-mono); max-width:100px;" oninput="App.updateNewBatchValue(this.value)">' +
         '<button class="btn btn-ghost btn-sm" onclick="App.addBatch()">Add batch</button>' +
       '</div>' +
-      '<div class="hint">Use the two digits that appear right after 3BR in the USN, e.g. 27 for students admitted in 2027.</div>' +
     '</div>' +
   '</div>' +
   '<div class="card">' +
@@ -780,7 +776,6 @@ function coursesTabHTML(){
     '</div>' +
     '<div class="row">' +
       '<div class="field"><label>Admission batch this exam is for</label><select onchange="App.updateCourseForm(&#39;year&#39;, this.value)">'+yearOpts+'</select>' +
-        '<div class="hint">Only students admitted in this batch (the digits right after 3BR in their USN) will be eligible.</div></div>' +
       '<div class="field"><label>Exam date</label><input type="date" value="'+esc(S.courseForm.date)+'" oninput="App.updateCourseForm(&#39;date&#39;, this.value)"></div>' +
     '</div>' +
     '<div class="row">' +
@@ -884,7 +879,6 @@ function seatingTabHTML(){
       '<label class="chip'+(S.strategy==='same'?' checked':'')+'"><input type="radio" name="strat" '+(S.strategy==='same'?'checked':'')+' onchange="App.setStrategy(&#39;same&#39;)"> Same branch together</label>' +
       '<label class="chip'+(S.strategy==='mixed'?' checked':'')+'"><input type="radio" name="strat" '+(S.strategy==='mixed'?'checked':'')+' onchange="App.setStrategy(&#39;mixed&#39;)"> Mix branches per bench</label>' +
     '</div>' +
-    '<div class="hint" style="margin-top:8px;">Mixed mode interleaves students from every selected branch seat-by-seat, so neighbours are rarely from the same branch.</div>' +
   '</div>' +
   '<div class="card">' +
     '<h3>3. Select rooms</h3>' +
@@ -895,7 +889,7 @@ function seatingTabHTML(){
     '<h3>4. Upload student list</h3>' +
     (course.branches.length===0
       ? '<div class="info-msg">This course has no branches selected. Edit branches in the Courses tab first.</div>'
-      : '<p class="hint" style="margin-bottom:14px;">Upload one CSV or Excel file per branch. Each file must contain a column named <b>USN</b>, and should include a <b>Name</b> column so student names appear on seat slips. Each file must only contain USNs from that branch.</p>' + branchFilesHTML) +
+      : '<p class="hint" style="margin-bottom:14px;"></p>' + branchFilesHTML) +
     capacityWarning +
   '</div>' +
   '<button class="btn btn-stamp" '+(canGenerate?'':'disabled')+' onclick="App.generateSeating()">'+(S.generating?'Generating…':'Generate seating')+'</button>' +
