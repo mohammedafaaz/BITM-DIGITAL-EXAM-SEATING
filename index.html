@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Digital Seating Slip — BITM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#0A1F44;
+    --ink-2:#153A6B;
+    --paper:#F4F8FD;
+    --paper-2:#E6EFFA;
+    --line:#C7DAF0;
+    --stamp:#1D4ED8;
+    --stamp-2:#15379E;
+    --gold:#2FA8E0;
+    --ok:#2F7A4F;
+    --ok-bg:#e7f2ea;
+    --warn:#B5790A;
+    --warn-bg:#fbf0dd;
+    --danger:#C0392B;
+    --danger-bg:#fbe9e7;
+    --muted:#5B6B85;
+    --radius:7px;
+    --font-display:'Space Grotesk', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+    --font-body:'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      repeating-linear-gradient(180deg, transparent, transparent 27px, rgba(10,31,68,0.035) 28px),
+      var(--paper);
+    color:var(--ink);
+    font-family:var(--font-body);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  #root{min-height:100vh; display:flex; flex-direction:column;}
+  a{color:inherit;}
+  button{font-family:inherit; cursor:pointer;}
+  input,select{font-family:inherit;}
+  ::selection{background:var(--gold); color:#fff;}
+
+  .topbar{
+    background:var(--ink);
+    color:var(--paper);
+    padding:14px 22px;
+    display:flex; align-items:center; justify-content:space-between;
+    border-bottom:3px solid var(--gold);
+    flex-wrap:wrap; gap:10px;
+  }
+  .brand{display:flex; align-items:baseline; gap:10px; cursor:pointer;}
+  .brand .mark{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:2px;
+    background:var(--gold); color:var(--ink); padding:3px 7px; border-radius:4px; font-weight:600;
+  }
+  .brand .name{font-family:var(--font-display); font-weight:700; font-size:19px; letter-spacing:0.2px;}
+  .brand .sub{font-family:var(--font-mono); font-size:11px; color:#c9d2e3; letter-spacing:1px;}
+  .top-actions{display:flex; align-items:center; gap:10px; font-family:var(--font-mono); font-size:12.5px;}
+  .top-actions .tag{background:rgba(255,255,255,0.08); padding:5px 10px; border-radius:20px; border:1px solid rgba(255,255,255,0.18);}
+  .linklike{background:none; border:none; color:var(--paper); text-decoration:underline; font-size:12.5px; font-family:var(--font-mono); padding:0;}
+
+  .wrap{max-width:1080px; margin:0 auto; padding:36px 22px 60px; width:100%; flex:1;}
+  .wrap.narrow{max-width:620px;}
+
+  h1,h2,h3{font-family:var(--font-display); margin:0 0 6px; color:var(--ink);}
+  .eyebrow{font-family:var(--font-mono); font-size:11.5px; letter-spacing:2px; text-transform:uppercase; color:var(--stamp); font-weight:600; margin-bottom:10px; display:block;}
+  p.lead{color:var(--muted); font-size:15px; line-height:1.55; max-width:560px;}
+
+  .hero{padding:36px 0 26px; border-bottom:1px dashed var(--line); margin-bottom:34px;}
+  .hero h1{font-size:38px; line-height:1.12; max-width:640px;}
+  .hero h1 .hl{color:var(--stamp);}
+
+  .choice-row{display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:8px;}
+  @media (max-width:640px){.choice-row{grid-template-columns:1fr;}}
+  .ticket{
+    background:var(--paper);
+    border:1.5px solid var(--ink);
+    border-radius:var(--radius);
+    padding:26px 24px;
+    position:relative;
+    transition:transform .15s ease, box-shadow .15s ease;
+    box-shadow:3px 3px 0 var(--line);
+  }
+  .ticket:hover{transform:translate(-2px,-2px); box-shadow:5px 5px 0 var(--gold);}
+  .ticket .num{font-family:var(--font-mono); font-size:12px; color:var(--stamp); font-weight:600; letter-spacing:1px;}
+  .ticket h3{font-size:21px; margin-top:6px;}
+  .ticket p{color:var(--muted); font-size:13.5px; line-height:1.5; margin:8px 0 18px;}
+  .perf{
+    position:absolute; top:0; bottom:0; width:0;
+    border-left:2px dashed var(--line);
+  }
+
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--ink); color:var(--paper);
+    border:none; border-radius:5px; padding:11px 18px;
+    font-weight:600; font-size:14px; font-family:var(--font-body);
+  }
+  .btn:hover{background:var(--ink-2);}
+  .btn:disabled{opacity:0.4; cursor:not-allowed;}
+  .btn-stamp{background:var(--stamp); color:#fff;}
+  .btn-stamp:hover{background:var(--stamp-2);}
+  .btn-ghost{background:transparent; color:var(--ink); border:1.5px solid var(--ink);}
+  .btn-ghost:hover{background:var(--ink); color:var(--paper);}
+  .btn-sm{padding:6px 11px; font-size:12.5px; border-radius:4px;}
+  .btn-danger{background:transparent; color:var(--danger); border:1.5px solid var(--danger);}
+  .btn-danger:hover{background:var(--danger); color:#fff;}
+  .btn-block{width:100%; justify-content:center;}
+
+  .card{
+    background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px; margin-bottom:20px;
+  }
+  .card h3{font-size:17px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12.5px; font-weight:600; color:var(--ink-2); margin-bottom:5px; letter-spacing:.2px;}
+  .field .hint{font-size:11.5px; color:var(--muted); margin-top:4px;}
+  input[type=text], input[type=number], input[type=date], input[type=time], input[type=password], input[type=file], select{
+    width:100%; padding:10px 11px; border:1.5px solid var(--line); border-radius:5px;
+    font-size:14.5px; background:var(--paper); color:var(--ink);
+  }
+  input[type=text]:focus, input[type=number]:focus, input[type=date]:focus, input[type=time]:focus, input[type=password]:focus, select:focus{
+    outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);
+  }
+  .usn-input{font-family:var(--font-mono); letter-spacing:2px; text-transform:uppercase; font-size:19px; text-align:center; padding:14px;}
+  .row{display:flex; gap:14px; flex-wrap:wrap;}
+  .row > *{flex:1; min-width:120px;}
+  .chip-group{display:flex; flex-wrap:wrap; gap:8px;}
+  .chip{
+    border:1.5px solid var(--line); border-radius:20px; padding:6px 13px; font-size:12.5px;
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none; background:#fff;
+  }
+  .chip input{margin:0;}
+  .chip.checked{border-color:var(--ink); background:var(--paper-2); font-weight:600;}
+  .error-msg{background:var(--danger-bg); color:#8B2E22; border:1px solid #e3b3ac; border-radius:5px; padding:10px 12px; font-size:13.5px; margin-bottom:14px;}
+  .ok-msg{background:var(--ok-bg); color:#1f5535; border:1px solid #b7dcc3; border-radius:5px; padding:10px 12px; font-size:13.5px; margin-bottom:14px;}
+  .info-msg{background:var(--paper-2); color:var(--ink-2); border:1px solid var(--line); border-radius:5px; padding:10px 12px; font-size:13px; margin-bottom:14px;}
+
+  .badge{font-family:var(--font-mono); font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; letter-spacing:.4px; text-transform:uppercase;}
+  .badge.free{background:var(--ok-bg); color:var(--ok);}
+  .badge.full{background:var(--warn-bg); color:var(--warn);}
+  .badge.maintenance{background:var(--danger-bg); color:var(--danger);}
+
+  .tabs{display:flex; gap:4px; border-bottom:1.5px solid var(--line); margin-bottom:24px; flex-wrap:wrap;}
+  .tab{
+    padding:10px 16px; font-size:13.5px; font-weight:600; color:var(--muted);
+    border:none; background:none; border-bottom:2.5px solid transparent; margin-bottom:-1.5px;
+    font-family:var(--font-mono); letter-spacing:.3px;
+  }
+  .tab.active{color:var(--ink); border-bottom-color:var(--stamp);}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th,td{text-align:left; padding:9px 10px; border-bottom:1px solid var(--line);}
+  th{font-family:var(--font-mono); font-size:11px; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); font-weight:600;}
+  td.mono, th.mono{font-family:var(--font-mono);}
+  .table-scroll{max-height:340px; overflow:auto; border:1px solid var(--line); border-radius:6px;}
+  .table-scroll table{margin:0;}
+  .table-scroll th{position:sticky; top:0; background:#fff;}
+
+  .room-list{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; margin-top:14px;}
+  .room-item{border:1.5px solid var(--line); border-radius:6px; padding:13px; background:#fff;}
+  .room-item .rn{font-family:var(--font-mono); font-weight:700; font-size:15px;}
+  .room-item .meta{font-size:12px; color:var(--muted); margin:5px 0 10px;}
+  .room-item .item-actions{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+
+  /* slip / ticket for student result */
+  .slip{
+    background:#fff; border:1.5px solid var(--ink); border-radius:8px;
+    padding:0; margin-bottom:26px; overflow:hidden;
+    box-shadow:4px 4px 0 var(--line);
+  }
+  .slip-head{
+    background:var(--ink); color:var(--paper); padding:16px 22px;
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;
+  }
+  .slip-head .course{font-family:var(--font-display); font-weight:700; font-size:17px;}
+  .slip-head .code{font-family:var(--font-mono); font-size:12px; color:var(--gold); letter-spacing:1px;}
+  .slip-body{padding:20px 22px;}
+  .slip-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:20px; padding-bottom:18px; border-bottom:1px dashed var(--line);}
+  .slip-field .k{font-family:var(--font-mono); font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:3px;}
+  .slip-field .v{font-size:15px; font-weight:600; color:var(--ink);}
+  .slip-field .v.mono{font-family:var(--font-mono);}
+
+  .front-bar{
+    text-align:center; font-family:var(--font-mono); font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--paper); background:var(--ink-2); border-radius:4px; padding:6px; margin-bottom:14px;
+  }
+  .grid-scroll{overflow-x:auto; padding-bottom:10px;}
+  .bench-grid{display:inline-grid; gap:14px; margin:0 auto;}
+  .bench{
+    border:2px solid var(--line); border-radius:6px; background:var(--paper-2);
+    display:flex; gap:4px; padding:7px; min-width:70px;
+  }
+  .bench.hl{border-color:var(--stamp); background:#e8f0fe; box-shadow:0 0 0 3px rgba(29,78,216,0.22);}
+  .seat{
+    flex:1; min-width:22px; height:38px; border-radius:3px; background:#fff; border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:9.5px; color:var(--muted); position:relative;
+  }
+  .seat.mine{
+    background:var(--stamp); border-color:var(--stamp-2); color:#fff; font-weight:700;
+    animation:pulseSeat 1.4s ease-out 1;
+  }
+  @media (prefers-reduced-motion: reduce){ .seat.mine{animation:none;} }
+  @keyframes pulseSeat{
+    0%{box-shadow:0 0 0 0 rgba(29,78,216,0.55);}
+    100%{box-shadow:0 0 0 9px rgba(29,78,216,0);}
+  }
+  .row-label{font-family:var(--font-mono); font-size:10px; color:var(--muted); display:flex; align-items:center; justify-content:flex-end; padding-right:4px;}
+  .col-label{font-family:var(--font-mono); font-size:10px; color:var(--muted); text-align:center;}
+  .legend{display:flex; gap:16px; margin-top:14px; font-size:11.5px; color:var(--muted); flex-wrap:wrap;}
+  .legend .sw{width:12px; height:12px; border-radius:2px; display:inline-block; vertical-align:-2px; margin-right:5px;}
+
+  .stamp-note{
+    display:inline-flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:12px;
+    color:var(--stamp); border:1.5px dashed var(--stamp); padding:6px 12px; border-radius:20px; margin-top:14px;
+    transform:rotate(-1deg);
+  }
+
+  .empty-block{
+    text-align:center; padding:50px 20px; border:1.5px dashed var(--line); border-radius:8px; background:#fff;
+  }
+  .empty-block .big{font-family:var(--font-display); font-size:20px; margin-bottom:6px;}
+  .empty-block p{color:var(--muted); font-size:13.5px; max-width:400px; margin:0 auto;}
+
+  .stat-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:24px;}
+  .stat{background:#fff; border:1px solid var(--line); border-radius:7px; padding:16px;}
+  .stat .n{font-family:var(--font-display); font-size:26px; font-weight:700;}
+  .stat .l{font-family:var(--font-mono); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;}
+
+  footer{text-align:center; padding:20px; font-size:11.5px; color:var(--muted); font-family:var(--font-mono);}
+  .spinner{display:inline-block; width:16px; height:16px; border:2px solid var(--line); border-top-color:var(--stamp); border-radius:50%; animation:spin .7s linear infinite; vertical-align:-3px; margin-right:6px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .skeleton-wrap{display:flex; align-items:center; justify-content:center; min-height:60vh; font-family:var(--font-mono); color:var(--muted); font-size:13px;}
+
+  /* ---------------- mobile responsiveness ---------------- */
+  @media (max-width:640px){
+    .wrap{padding:22px 14px 40px;}
+    .hero{padding:22px 0 18px;}
+    .hero h1{font-size:28px;}
+    .brand .sub{display:none;}
+    .top-actions{font-size:11.5px;}
+    table{font-size:12.5px;}
+    th,td{padding:8px 7px;}
+    .card{padding:16px;}
+    .stat .n{font-size:22px;}
+    .slip-head{padding:14px 16px;}
+    .slip-body{padding:16px;}
+    .slip-grid{grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px;}
+    .row{gap:10px;}
+    .row > *{min-width:100%;}
+    input[type=text], input[type=number], input[type=date], input[type=time], input[type=password], input[type=file], select{
+      font-size:16px; /* prevents iOS auto-zoom on focus */
+    }
+    .usn-input{font-size:17px; padding:12px;}
+    .tabs{gap:2px;}
+    .tab{padding:9px 11px; font-size:12.5px;}
+  }
+  @media (max-width:400px){
+    .hero h1{font-size:24px;}
+    .choice-row{gap:14px;}
+    .ticket{padding:20px 16px;}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------------- Supabase backend config ---------------- */
+/* Fill these in with your own Supabase project's values (Project Settings -> API).
+   See DEPLOY.md for how to create the project and run the schema. */
+var SUPABASE_URL = "https://jrruufugszuolkqojwaj.supabase.co";
+var SUPABASE_ANON_KEY = "sb_publishable_v6ITTSflgBjAiKbYiv9i-A_dXgA0yGa";
+
+var sb = null;
+var SUPABASE_CONFIG_OK = SUPABASE_URL.indexOf("YOUR_SUPABASE") !== 0 && SUPABASE_ANON_KEY.indexOf("YOUR_SUPABASE") !== 0;
+if(SUPABASE_CONFIG_OK && window.supabase){
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+/* window.storage polyfill: the app's data layer was originally written
+   against Claude's artifact key-value storage API. This shim reproduces
+   the same get/set/delete interface on top of a single Supabase table
+   (kv_store: key text primary key, value text) so the rest of the app
+   needs no other changes. The "shared" flag is accepted for interface
+   compatibility but not used — every key lives in the one shared table. */
+window.storage = {
+  get: async function(key){
+    if(!sb) throw new Error('Supabase is not configured — set SUPABASE_URL / SUPABASE_ANON_KEY at the top of the script.');
+    var res = await sb.from('kv_store').select('value').eq('key', key).maybeSingle();
+    if(res.error) throw res.error;
+    return res.data ? { value: res.data.value } : null;
+  },
+  set: async function(key, value){
+    if(!sb) throw new Error('Supabase is not configured — set SUPABASE_URL / SUPABASE_ANON_KEY at the top of the script.');
+    var res = await sb.from('kv_store').upsert({ key: key, value: value });
+    if(res.error) throw res.error;
+    return { value: value };
+  },
+  delete: async function(key){
+    if(!sb) throw new Error('Supabase is not configured — set SUPABASE_URL / SUPABASE_ANON_KEY at the top of the script.');
+    var res = await sb.from('kv_store').delete().eq('key', key);
+    if(res.error) throw res.error;
+    return { deleted: true };
+  }
+};
+
+/* ---------------- constants ---------------- */
+var BLOCKS = ["Admin Block","Millenium Block","Electrical Block","Data Science Block","Silver Jubilee Block","CV Raman Block"];
+var BRANCHES = ["AI","CS","ME","CV","CD","CA","EE","EC"];
+var USN_RE = /^3BR(\d{2})([A-Z]{2})(\d{3})$/;
+var CURRENT_YEAR_2D = new Date().getFullYear() % 100;
+var ADMISSION_YEARS = (function(){
+  var arr = [];
+  for(var i=0;i<=6;i++){ arr.push(String(CURRENT_YEAR_2D - i).padStart(2,'0')); }
+  return arr;
+})();
+
+/* ---------------- in-memory data (hydrated from shared storage) ---------------- */
+var ROOMS = [];      // {id, block, roomNumber, rows, cols, perBench, status}
+var COURSES = [];    // {id, name, code, branches[], date, session, year}
+var CUSTOM_BATCHES = []; // additional admission-year codes added manually by admin
+var ADMIN_PASSWORD = "Adminofbitm@2026"; // fixed admin password (not stored / not changeable in-app)
+var ASSIGN_CACHE = {};   // courseId -> assignment object (or null), refreshed on demand
+var FAILED_LOGIN_COUNT = 0;
+var LOCK_UNTIL_TS = 0;
+var DATA_READY = false;
+
+function allBatchYears(){
+  var set = {};
+  ADMISSION_YEARS.forEach(function(y){ set[y]=true; });
+  CUSTOM_BATCHES.forEach(function(y){ set[y]=true; });
+  return Object.keys(set).sort(function(a,b){ return b.localeCompare(a); });
+}
+
+/* ---------------- app state ---------------- */
+var S = {
+  screen: 'home',
+  adminTab: 'overview',
+  isAdmin: false,
+  studentSlips: null,
+  studentSearched: false,
+  studentUsn: '',
+  loginError: '',
+  adminLoginError: '',
+  selectedBlock: BLOCKS[0],
+  roomFormError: '',
+  courseFormError: '',
+  courseBranchSel: {},
+  courseForm: { name:'', code:'', year: ADMISSION_YEARS[0], date:'', session:'FN', time:'' },
+  newBatchValue: '',
+  newBatchError: '',
+  selectedCourseId: '',
+  strategy: 'same',
+  selectedRoomIds: {},
+  csvFiles: {},        // branch -> {fileName, error, result:{valid,invalid,wrongBranch,outOfYear,wrongBranchSet}}
+  seatingResult: null, // published (or just-generated) seating for the selected course
+  generating: false,
+  addStudentError: '',
+  removeStudentError: '',
+  toast: ''
+};
+
+/* ---------------- helpers ---------------- */
+function uid(p){ return (p||'id_') + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function getBranch(usn){
+  var m = String(usn||'').toUpperCase().trim().match(USN_RE);
+  if(!m) return null;
+  var branch = m[2];
+  return BRANCHES.indexOf(branch) !== -1 ? branch : null;
+}
+function getYear(usn){
+  var m = String(usn||'').toUpperCase().trim().match(USN_RE);
+  return m ? m[1] : null;
+}
+function isValidUSN(usn){ return !!getBranch(usn); }
+function roomById(id){ return ROOMS.find(function(r){return r.id===id;}); }
+function courseById(id){ return COURSES.find(function(c){return c.id===id;}); }
+function roomCapacity(r){ return r.rows * r.cols * r.perBench; }
+function sessionLabel(code){ return code==='AN' ? 'Afternoon' : 'Morning'; }
+function formatTime12(t){
+  if(!t) return '';
+  var m = String(t).match(/^(\d{1,2}):(\d{2})/);
+  if(!m) return t;
+  var h = parseInt(m[1],10), min = m[2];
+  var ampm = h>=12 ? 'PM' : 'AM';
+  var h12 = h % 12; if(h12===0) h12 = 12;
+  return h12+':'+min+' '+ampm;
+}
+
+/* ---------------- storage layer ---------------- */
+/* Mobile connections can be flaky: a save sometimes actually succeeds on
+   the server but the response never makes it back to the page, so the
+   call looks like it failed. To avoid a false "could not save" message,
+   retry once, and if that still throws, read the value back before
+   giving up — if it matches what we tried to save, treat it as saved. */
+function sleep(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+async function storageSetSafe(key, value, shared){
+  for(var attempt=0; attempt<2; attempt++){
+    try{
+      await window.storage.set(key, value, shared);
+      return true;
+    }catch(e){
+      if(attempt===0){ await sleep(700); continue; }
+      try{
+        var check = await window.storage.get(key, shared);
+        if(check && check.value===value) return true;
+      }catch(e2){ /* fall through to failure */ }
+      console.error('save failed for '+key, e);
+      return false;
+    }
+  }
+  return false;
+}
+async function loadAll(){
+  try{
+    var r = await window.storage.get('rooms', true);
+    ROOMS = r && r.value ? JSON.parse(r.value) : [];
+  }catch(e){ ROOMS = []; }
+  try{
+    var c = await window.storage.get('courses', true);
+    COURSES = c && c.value ? JSON.parse(c.value) : [];
+  }catch(e){ COURSES = []; }
+  try{
+    var cb = await window.storage.get('customBatches', true);
+    CUSTOM_BATCHES = cb && cb.value ? JSON.parse(cb.value) : [];
+  }catch(e){ CUSTOM_BATCHES = []; }
+  try{
+    if(localStorage.getItem('adminRemember')==='1'){ S.isAdmin = true; S.screen = 'adminDashboard'; S.adminTab = 'overview'; }
+  }catch(e){ /* not remembered */ }
+  DATA_READY = true;
+}
+async function saveCustomBatches(){
+  return storageSetSafe('customBatches', JSON.stringify(CUSTOM_BATCHES), true);
+}
+async function refreshAssignCache(){
+  var next = {};
+  for(var i=0;i<COURSES.length;i++){
+    next[COURSES[i].id] = await getAssignment(COURSES[i].id);
+  }
+  ASSIGN_CACHE = next;
+}
+function roomBookings(roomId){
+  return COURSES.filter(function(c){
+    var a = ASSIGN_CACHE[c.id];
+    return a && a.roomsUsed && a.roomsUsed.indexOf(roomId) !== -1;
+  });
+}
+async function saveRooms(){
+  return storageSetSafe('rooms', JSON.stringify(ROOMS), true);
+}
+async function saveCourses(){
+  return storageSetSafe('courses', JSON.stringify(COURSES), true);
+}
+async function saveAssignment(courseId, data){
+  return storageSetSafe('assign_'+courseId, JSON.stringify(data), true);
+}
+async function getAssignment(courseId){
+  try{
+    var res = await window.storage.get('assign_'+courseId, true);
+    return res && res.value ? JSON.parse(res.value) : null;
+  }catch(e){ return null; }
+}
+async function deleteAssignment(courseId){
+  try{ await window.storage.delete('assign_'+courseId, true); }catch(e){ /* may not exist */ }
+}
+
+/* ---------------- render root ---------------- */
+function render(){
+  var root = document.getElementById('root');
+  if(!SUPABASE_CONFIG_OK){
+    root.innerHTML = '<div class="wrap narrow"><div class="card"><h3 style="color:#b23b3b;">Backend not configured</h3>' +
+      '<p class="hint">This deployment is missing its Supabase URL and anon key. Open the HTML file, find <span class="mono">SUPABASE_URL</span> and <span class="mono">SUPABASE_ANON_KEY</span> near the top of the &lt;script&gt; block, and fill them in with your project\'s values. See DEPLOY.md for the full setup steps.</p></div></div>';
+    return;
+  }
+  if(!DATA_READY){
+    root.innerHTML = '<div class="skeleton-wrap"><span class="spinner"></span> Loading seating records&hellip;</div>';
+    return;
+  }
+  var html = topbarHTML();
+  if(S.screen==='home') html += homeHTML();
+  else if(S.screen==='studentLogin') html += studentLoginHTML();
+  else if(S.screen==='studentResult') html += studentResultHTML();
+  else if(S.screen==='adminLogin') html += adminLoginHTML();
+  else if(S.screen==='adminDashboard') html += adminDashboardHTML();
+  html += '<footer>&copy; BITM Examination Cell &middot; Digital Seating Arrangement System</footer>';
+  root.innerHTML = html;
+  afterRenderHooks();
+}
+
+function goHome(){ S.screen='home'; S.studentSlips=null; S.studentSearched=false; render(); }
+
+/* ---------------- topbar ---------------- */
+function topbarHTML(){
+  var right = '';
+  if(S.isAdmin){
+    right = '<span class="tag">ADMIN SESSION</span><button class="linklike" onclick="App.adminLogout()">Log out</button>';
+  } else if(S.screen!=='home'){
+    right = '<button class="linklike" onclick="App.goHome()">&larr; Home</button>';
+  }
+  return '' +
+  '<div class="topbar">' +
+    '<div class="brand" onclick="App.goHome()">' +
+      '<span class="mark">BITM</span>' +
+      '<span class="name">Digital Seating Slip</span>' +
+      '<span class="sub">EXAMINATION CELL</span>' +
+    '</div>' +
+    '<div class="top-actions">' + right + '</div>' +
+  '</div>';
+}
+
+/* ---------------- home ---------------- */
+function homeHTML(){
+  return '' +
+  '<div class="wrap">' +
+    '<div class="hero">' +
+      '<span class="eyebrow">Examination seating</span>' +
+      '<h1>Find your <span class="hl">exam seat</span><br>online.</h1>' +
+      '<p class="lead">Enter your USN to view your assigned examination room, bench and seat number.</p>' +
+    '</div>' +
+    '<div class="choice-row">' +
+      '<div class="ticket" onclick="App.go(&#39;studentLogin&#39;)">' +
+        '<span class="perf" style="left:0"></span>' +
+        '<span class="num">STUDENT</span>' +
+        '<h3>Student login</h3>' +
+        '<p>View your assigned examination room, bench and seat number using your USN.</p>' +
+        '<button class="btn btn-stamp btn-block">Find my seat</button>' +
+      '</div>' +
+      '<div class="ticket" onclick="App.go(&#39;adminLogin&#39;)">' +
+        '<span class="num">ADMIN</span>' +
+        '<h3>Examination cell login</h3>' +
+        '<p>Manage blocks and rooms, configure courses, and generate seating arrangements.</p>' +
+        '<button class="btn btn-ghost btn-block">Admin login</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+/* ---------------- student login ---------------- */
+function studentLoginHTML(){
+  return '' +
+  '<div class="wrap narrow">' +
+    '<span class="eyebrow">Student lookup</span>' +
+    '<h2>Enter your USN</h2>' +
+    '<p class="lead" style="margin-bottom:22px;">Format: 3BR + year (2 digits) + branch code + roll number. Example: 3BR24AI092.</p>' +
+    (S.loginError ? '<div class="error-msg">'+esc(S.loginError)+'</div>' : '') +
+    '<div class="card">' +
+      '<div class="field">' +
+        '<label for="usnInput">University Seat Number</label>' +
+        '<input id="usnInput" class="usn-input" type="text" maxlength="10" placeholder="3BR24AI092" value="'+esc(S.studentUsn)+'" autocomplete="off">' +
+        '<div class="hint">Branch codes in use: '+BRANCHES.join(', ')+'</div>' +
+      '</div>' +
+      '<button class="btn btn-stamp btn-block" onclick="App.studentSubmit()">Find my seat &rarr;</button>' +
+    '</div>' +
+  '</div>';
+}
+
+/* ---------------- student result ---------------- */
+function studentResultHTML(){
+  var usn = S.studentUsn.toUpperCase();
+  var body = '';
+  if(!S.studentSlips || S.studentSlips.length===0){
+    body = '' +
+      '<div class="empty-block">' +
+        '<div class="big">No exams scheduled for '+esc(usn)+'</div>' +
+        '<p>No seating has been assigned to this USN for any published examination. If you believe this is incorrect, please contact the examination cell.</p>' +
+      '</div>';
+  } else {
+    body = S.studentSlips.map(slipHTML).join('');
+  }
+  return '' +
+  '<div class="wrap">' +
+    '<span class="eyebrow">Seat lookup result</span>' +
+    '<h2 style="margin-bottom:20px;">'+esc(usn)+'</h2>' +
+    body +
+    '<button class="btn btn-ghost" onclick="App.go(&#39;studentLogin&#39;)">&larr; Search another USN</button>' +
+  '</div>';
+}
+
+function slipHTML(slip){
+  var room = slip.room, course = slip.course, seat = slip.seat;
+  return '' +
+  '<div class="slip">' +
+    '<div class="slip-head">' +
+      '<div><div class="course">'+esc(course.name)+'</div><div class="code">'+esc(course.code)+(course.date?(' &middot; '+esc(course.date)):'')+' &middot; '+esc(sessionLabel(course.session))+(course.time?(' &middot; '+esc(formatTime12(course.time))):'')+'</div></div>' +
+      '<div class="code">'+esc(slip.branch)+'</div>' +
+    '</div>' +
+    '<div class="slip-body">' +
+      '<div class="slip-grid">' +
+        (slip.name ? '<div class="slip-field"><div class="k">Name</div><div class="v">'+esc(slip.name)+'</div></div>' : '') +
+        '<div class="slip-field"><div class="k">USN</div><div class="v mono">'+esc(slip.usn)+'</div></div>' +
+        '<div class="slip-field"><div class="k">Branch / Batch</div><div class="v mono">'+esc(slip.branch)+' &middot; 20'+esc(course.year)+'</div></div>' +
+        '<div class="slip-field"><div class="k">Session</div><div class="v">'+esc(sessionLabel(course.session))+'</div></div>' +
+        '<div class="slip-field"><div class="k">Reporting time</div><div class="v mono">'+esc(formatTime12(course.time)||'—')+'</div></div>' +
+        '<div class="slip-field"><div class="k">Block</div><div class="v">'+esc(room?room.block:'—')+'</div></div>' +
+        '<div class="slip-field"><div class="k">Room No.</div><div class="v mono">'+esc(room?room.roomNumber:'—')+'</div></div>' +
+        '<div class="slip-field"><div class="k">Bench</div><div class="v mono">R'+seat.row+' &middot; C'+seat.col+'</div></div>' +
+        '<div class="slip-field"><div class="k">Seat</div><div class="v mono">'+seat.seat+' of '+(room?room.perBench:'—')+'</div></div>' +
+      '</div>' +
+      (room ? roomGridHTML(room, seat) : '<div class="info-msg">This room record could not be found. Please contact the examination cell.</div>') +
+      '<div class="stamp-note">&#9679; Please arrive at least 15 minutes before the scheduled time</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function roomGridHTML(room, highlight){
+  var rows = room.rows, cols = room.cols, perBench = room.perBench;
+  var colWidth = cols <= 3 ? '96px' : '84px';
+  var colTemplate = 'repeat('+cols+', minmax('+colWidth+', 120px))';
+  var html = '<div class="front-bar">Front &middot; Board / Invigilator&#39;s desk</div>';
+  html += '<div class="grid-scroll"><div class="bench-grid" style="grid-template-columns:'+colTemplate+';">';
+  for(var r=1; r<=rows; r++){
+    for(var c=1; c<=cols; c++){
+      var isHL = (r===highlight.row && c===highlight.col);
+      html += '<div class="bench'+(isHL?' hl':'')+'" title="Row '+r+', Col '+c+'">';
+      for(var s=1; s<=perBench; s++){
+        var mine = isHL && s===highlight.seat;
+        html += '<div class="seat'+(mine?' mine':'')+'">'+(mine?'YOU':'')+'</div>';
+      }
+      html += '</div>';
+    }
+  }
+  html += '</div></div>';
+  html += '<div class="legend"><span><span class="sw" style="background:var(--paper-2); border:1px solid var(--line);"></span>Empty seat</span><span><span class="sw" style="background:var(--stamp);"></span>Your seat</span></div>';
+  return html;
+}
+
+/* ---------------- admin login ---------------- */
+function adminLoginHTML(){
+  var locked = Date.now() < LOCK_UNTIL_TS;
+  return '' +
+  '<div class="wrap narrow">' +
+    '<span class="eyebrow">Examination cell access</span>' +
+    '<h2>Admin login</h2>' +
+    '<p class="lead" style="margin-bottom:22px;">Manage blocks, rooms, courses and seating arrangements.</p>' +
+    (S.adminLoginError ? '<div class="error-msg">'+esc(S.adminLoginError)+'</div>' : '') +
+    '<div class="card">' +
+      '<div class="field">' +
+        '<label for="adminPass">Admin password</label>' +
+        '<input id="adminPass" type="password" placeholder="Enter admin password" autocomplete="off"'+(locked?' disabled':'')+'>' +
+        '<div class="hint">Authorized examination cell personnel only.</div>' +
+      '</div>' +
+      '<label style="display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--ink-2); margin-bottom:16px; cursor:pointer;">' +
+        '<input type="checkbox" id="adminRememberMe" checked style="width:auto;"> Remember me on this device' +
+      '</label>' +
+      '<button class="btn btn-stamp btn-block" '+(locked?'disabled':'')+' onclick="App.adminSubmit()">Log in</button>' +
+    '</div>' +
+  '</div>';
+}
+/* ---------------- admin dashboard ---------------- */
+function adminDashboardHTML(){
+  var tabs = [
+    ['overview','Overview'],
+    ['rooms','Blocks & Rooms'],
+    ['courses','Courses'],
+    ['seating','Generate Seating']
+  ];
+  var tabBar = '<div class="tabs">' + tabs.map(function(t){
+    return '<button class="tab'+(S.adminTab===t[0]?' active':'')+'" onclick="App.setAdminTab(&#39;'+t[0]+'&#39;)">'+t[1]+'</button>';
+  }).join('') + '</div>';
+
+  var body = '';
+  if(S.adminTab==='overview') body = overviewTabHTML();
+  else if(S.adminTab==='rooms') body = roomsTabHTML();
+  else if(S.adminTab==='courses') body = coursesTabHTML();
+  else if(S.adminTab==='seating') body = seatingTabHTML();
+
+  return '<div class="wrap"><span class="eyebrow">Exam cell</span><h2 style="margin-bottom:18px;">Admin dashboard</h2>' + tabBar + body + '</div>';
+}
+
+function overviewTabHTML(){
+  var totalCapacity = ROOMS.reduce(function(a,r){return a+roomCapacity(r);},0);
+  var maint = ROOMS.filter(function(r){return r.status==='maintenance';}).length;
+  var published = COURSES.filter(function(c){ var a=ASSIGN_CACHE[c.id]; return a && a.seatMap && Object.keys(a.seatMap).length; }).length;
+  return '' +
+  '<div class="stat-row">' +
+    '<div class="stat"><div class="n">'+ROOMS.length+'</div><div class="l">Rooms across '+BLOCKS.length+' blocks</div></div>' +
+    '<div class="stat"><div class="n">'+totalCapacity+'</div><div class="l">Total seat capacity</div></div>' +
+    '<div class="stat"><div class="n">'+COURSES.length+'</div><div class="l">Courses configured</div></div>' +
+    '<div class="stat"><div class="n">'+published+'</div><div class="l">Courses with seating published</div></div>' +
+  '</div>' +
+  '<div class="card">' +
+    '<h3>Reset all data</h3>' +
+    '<p class="hint" style="margin-bottom:14px;">Wipes every room, course and published seating for the whole college. This cannot be undone.</p>' +
+    '<button class="btn btn-danger" onclick="App.resetAll()">Reset all data</button>' +
+  '</div>';
+}
+
+function roomsTabHTML(){
+  var blockRooms = ROOMS.filter(function(r){return r.block===S.selectedBlock;});
+  var blockOpts = BLOCKS.map(function(b){return '<option value="'+esc(b)+'"'+(b===S.selectedBlock?' selected':'')+'>'+esc(b)+'</option>';}).join('');
+  var list = blockRooms.length ? '<div class="room-list">' + blockRooms.map(roomItemHTML).join('') + '</div>'
+    : '<div class="empty-block"><div class="big">No rooms yet in '+esc(S.selectedBlock)+'</div><p>Add the first room using the form above.</p></div>';
+
+  return '' +
+  '<div class="card">' +
+    '<h3>Select block</h3>' +
+    '<select onchange="App.setBlock(this.value)">' + blockOpts + '</select>' +
+  '</div>' +
+  '<div class="card">' +
+    '<h3>Add room to '+esc(S.selectedBlock)+'</h3>' +
+    (S.roomFormError ? '<div class="error-msg">'+esc(S.roomFormError)+'</div>' : '') +
+    '<div class="row">' +
+      '<div class="field"><label>Room number</label><input id="roomNumber" type="text" placeholder="e.g. 204"></div>' +
+      '<div class="field"><label>Rows</label><input id="roomRows" type="number" min="1" value="6"></div>' +
+      '<div class="field"><label>Columns</label><input id="roomCols" type="number" min="1" max="4" value="3"></div>' +
+      '<div class="field"><label>Students / bench</label>' +
+        '<select id="roomPerBench"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select>' +
+      '</div>' +
+      '<div class="field"><label>Status</label>' +
+        '<select id="roomStatus"><option value="free" selected>Free</option><option value="maintenance">Under maintenance</option></select>' +
+      '</div>' +
+    '</div>' +
+    '<button class="btn btn-stamp" onclick="App.addRoom()">Add room</button>' +
+  '</div>' +
+  list;
+}
+
+function roomItemHTML(r){
+  var cap = roomCapacity(r);
+  var badgeCls = r.status==='maintenance' ? 'maintenance' : 'free';
+  var badgeLabel = r.status==='maintenance' ? 'Maintenance' : 'Free';
+  var bookings = roomBookings(r.id);
+  var bookingsLine = bookings.length
+    ? ('<div class="meta">Booked for: '+bookings.map(function(c){ return esc(c.code)+' ('+esc(c.date||'no date')+' &middot; '+esc(sessionLabel(c.session))+')'; }).join(', ')+'</div>')
+    : '<div class="meta" style="color:var(--ok);">No seating published for this room yet &mdash; free to use.</div>';
+  return '' +
+  '<div class="room-item">' +
+    '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
+      '<span class="rn">Room '+esc(r.roomNumber)+'</span>' +
+      '<span class="badge '+badgeCls+'">'+badgeLabel+'</span>' +
+    '</div>' +
+    '<div class="meta">'+r.rows+' rows &times; '+r.cols+' cols &middot; '+r.perBench+'/bench &middot; capacity '+cap+'</div>' +
+    bookingsLine +
+    '<div class="item-actions">' +
+      '<select class="btn-sm" style="border:1.5px solid var(--line); border-radius:4px;" onchange="App.setRoomStatus(&#39;'+r.id+'&#39;, this.value)">' +
+        '<option value="free"'+(r.status==='free'?' selected':'')+'>Free</option>' +
+        '<option value="maintenance"'+(r.status==='maintenance'?' selected':'')+'>Maintenance</option>' +
+      '</select>' +
+      '<button class="btn btn-danger btn-sm" onclick="App.deleteRoom(&#39;'+r.id+'&#39;)">Delete</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function coursesTabHTML(){
+  var branchChips = BRANCHES.map(function(b){
+    var checked = !!S.courseBranchSel[b];
+    return '<label class="chip'+(checked?' checked':'')+'"><input type="checkbox" '+(checked?'checked':'')+' onchange="App.toggleCourseBranch(&#39;'+b+'&#39;)"> '+b+'</label>';
+  }).join('');
+  var years = allBatchYears();
+  if(years.indexOf(S.courseForm.year)===-1) S.courseForm.year = years[0];
+  var yearOpts = years.map(function(y){ return '<option value="'+y+'"'+(y===S.courseForm.year?' selected':'')+'>Batch of 20'+y+' (year code '+y+')</option>'; }).join('');
+
+  var list = COURSES.length ? '<div class="table-scroll"><table><thead><tr><th>Code</th><th>Course</th><th>Batch</th><th>Branches</th><th>Date</th><th>Session</th><th>Time</th><th></th></tr></thead><tbody>' +
+    COURSES.map(function(c){
+      return '<tr><td class="mono">'+esc(c.code)+'</td><td>'+esc(c.name)+'</td><td class="mono">20'+esc(c.year)+'</td><td>'+esc(c.branches.join(', '))+'</td><td>'+esc(c.date||'—')+'</td><td>'+esc(sessionLabel(c.session))+'</td><td class="mono">'+esc(formatTime12(c.time)||'—')+'</td>' +
+        '<td><button class="btn btn-danger btn-sm" onclick="App.deleteCourse(&#39;'+c.id+'&#39;)">Delete</button></td></tr>';
+    }).join('') + '</tbody></table></div>'
+    : '<div class="empty-block"><div class="big">No courses yet</div><p>Add a course below to make it selectable for seating.</p></div>';
+
+  return '' +
+  '<div class="card">' +
+    '<h3>Admission batches</h3>' +
+    (S.newBatchError ? '<div class="error-msg">'+esc(S.newBatchError)+'</div>' : '') +
+    '<div class="field">' +
+      '<label>Add a new batch (2-digit admission year code)</label>' +
+      '<div style="display:flex; gap:8px;">' +
+        '<input id="newBatchInput" type="text" maxlength="2" placeholder="e.g. 27" value="'+esc(S.newBatchValue)+'" style="font-family:var(--font-mono); max-width:100px;" oninput="App.updateNewBatchValue(this.value)">' +
+        '<button class="btn btn-ghost btn-sm" onclick="App.addBatch()">Add batch</button>' +
+      '</div>' +
+      '<div class="hint">Use the two digits that appear right after 3BR in the USN, e.g. 27 for students admitted in 2027.</div>' +
+    '</div>' +
+  '</div>' +
+  '<div class="card">' +
+    '<h3>Add course</h3>' +
+    (S.courseFormError ? '<div class="error-msg">'+esc(S.courseFormError)+'</div>' : '') +
+    '<div class="row">' +
+      '<div class="field"><label>Course name</label><input id="courseName" type="text" placeholder="e.g. Data Structures" value="'+esc(S.courseForm.name)+'" oninput="App.updateCourseForm(&#39;name&#39;, this.value)"></div>' +
+      '<div class="field"><label>Course code</label><input id="courseCode" type="text" placeholder="e.g. BCS304" value="'+esc(S.courseForm.code)+'" oninput="App.updateCourseForm(&#39;code&#39;, this.value)"></div>' +
+    '</div>' +
+    '<div class="row">' +
+      '<div class="field"><label>Admission batch this exam is for</label><select onchange="App.updateCourseForm(&#39;year&#39;, this.value)">'+yearOpts+'</select>' +
+        '<div class="hint">Only students admitted in this batch (the digits right after 3BR in their USN) will be eligible.</div></div>' +
+      '<div class="field"><label>Exam date</label><input type="date" value="'+esc(S.courseForm.date)+'" oninput="App.updateCourseForm(&#39;date&#39;, this.value)"></div>' +
+    '</div>' +
+    '<div class="row">' +
+      '<div class="field"><label>Session</label><select onchange="App.updateCourseForm(&#39;session&#39;, this.value)"><option value="FN"'+(S.courseForm.session==='FN'?' selected':'')+'>Morning</option><option value="AN"'+(S.courseForm.session==='AN'?' selected':'')+'>Afternoon</option></select></div>' +
+      '<div class="field"><label>Reporting time</label><input type="time" value="'+esc(S.courseForm.time)+'" oninput="App.updateCourseForm(&#39;time&#39;, this.value)"></div>' +
+    '</div>' +
+    '<div class="field"><label>Branches appearing for this exam</label><div class="chip-group">'+branchChips+'</div></div>' +
+    '<button class="btn btn-stamp" onclick="App.addCourse()">Add course</button>' +
+  '</div>' +
+  list;
+}
+
+function seatingTabHTML(){
+  if(COURSES.length===0){
+    return '<div class="empty-block"><div class="big">Add a course first</div><p>Go to the Courses tab and create at least one course before generating seating.</p></div>';
+  }
+  var course = courseById(S.selectedCourseId) || COURSES[0];
+  if(!S.selectedCourseId) S.selectedCourseId = course.id;
+
+  var courseOpts = COURSES.map(function(c){
+    return '<option value="'+c.id+'"'+(c.id===course.id?' selected':'')+'>'+esc(c.code)+' — '+esc(c.name)+' (Batch 20'+esc(c.year)+')</option>';
+  }).join('');
+
+  var eligibleRooms = ROOMS.filter(function(r){ return r.status!=='maintenance'; });
+  var byBlock = {};
+  eligibleRooms.forEach(function(r){ (byBlock[r.block]=byBlock[r.block]||[]).push(r); });
+
+  var roomsHTML = Object.keys(byBlock).length ? Object.keys(byBlock).map(function(block){
+    var items = byBlock[block].map(function(r){
+      var checked = !!S.selectedRoomIds[r.id];
+      return '<label class="chip'+(checked?' checked':'')+'"><input type="checkbox" '+(checked?'checked':'')+' onchange="App.toggleRoomSelect(&#39;'+r.id+'&#39;)"> '+esc(r.roomNumber)+' &middot; cap '+roomCapacity(r)+'</label>';
+    }).join('');
+    return '<div style="margin-bottom:12px;"><div class="hint" style="margin-bottom:6px; font-weight:600;">'+esc(block)+'</div><div class="chip-group">'+items+'</div></div>';
+  }).join('') : '<div class="info-msg">No maintenance-free rooms exist yet. Add rooms in the Blocks &amp; Rooms tab.</div>';
+
+  var selectedCount = Object.keys(S.selectedRoomIds).filter(function(id){return S.selectedRoomIds[id];}).length;
+  var selectedCapacity = ROOMS.filter(function(r){return S.selectedRoomIds[r.id];}).reduce(function(a,r){return a+roomCapacity(r);},0);
+
+  var totalValid = 0, allBranchesReady = course.branches.length>0;
+  course.branches.forEach(function(b){
+    var entry = S.csvFiles[b];
+    var res = entry && entry.result;
+    if(!res || res.wrongBranch.length>0 || res.valid.length===0){ allBranchesReady = false; }
+    if(res) totalValid += res.valid.length;
+  });
+
+  var branchFilesHTML = course.branches.map(function(b){ return branchFileRowHTML(b, course); }).join('');
+  var capacityWarning = '';
+  if(allBranchesReady && selectedCapacity && totalValid > selectedCapacity){
+    capacityWarning = '<div class="error-msg">Selected rooms only hold '+selectedCapacity+' seats, but '+totalValid+' eligible students were parsed. Add more rooms or some students will be left unseated.</div>';
+  }
+
+  var canGenerate = course && selectedCount>0 && allBranchesReady && totalValid>0;
+
+  var resultHTML = '';
+  if(S.seatingResult && S.seatingResult.courseId===course.id){
+    var res = S.seatingResult;
+    var unseatedHTML = (res.unseated && res.unseated.length)
+      ? ('<div class="error-msg">Could not seat: '+res.unseated.map(esc).join(', ')+'. Add another room and regenerate to fit '+(res.unseated.length>1?'them':'this student')+'.</div>')
+      : '';
+    resultHTML = '<div class="card">' +
+      '<h3>Published seating for '+esc(course.code)+'</h3>' +
+      '<div class="ok-msg">'+res.seatedCount+' student(s) seated across '+res.roomsUsed.length+' room(s).'+(res.generatedAt?(' Last generated '+esc(new Date(res.generatedAt).toLocaleString())+'.'):'')+'</div>' +
+      unseatedHTML +
+      '<div class="table-scroll"><table><thead><tr><th>USN</th><th>Name</th><th>Branch</th><th>Room</th><th>Bench</th><th>Seat</th></tr></thead><tbody>' +
+      res.rows.map(function(row){
+        return '<tr><td class="mono">'+esc(row.usn)+'</td><td>'+esc(row.name||'—')+'</td><td>'+esc(row.branch)+'</td><td>'+esc(row.roomLabel)+'</td><td class="mono">R'+row.row+' C'+row.col+'</td><td class="mono">'+row.seat+'</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="row" style="margin-top:16px;">' +
+        '<button class="btn btn-ghost btn-sm" onclick="App.downloadSeatingCSV()">Download as CSV</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="App.clearSeating()">Clear published seating</button>' +
+      '</div>' +
+      '<div class="row" style="margin-top:16px;">' +
+        '<div class="field"><label>Add a single student (late addition)</label>' +
+          (S.addStudentError?('<div class="error-msg">'+esc(S.addStudentError)+'</div>'):'') +
+          '<div class="row" style="gap:8px;">' +
+            '<input id="addStudentUsn" type="text" maxlength="10" placeholder="3BR24AI099" style="font-family:var(--font-mono); text-transform:uppercase;">' +
+            '<input id="addStudentName" type="text" placeholder="Student name (optional)">' +
+            '<button class="btn btn-stamp btn-sm" onclick="App.addStudentToSeating()">Add</button>' +
+          '</div>' +
+          '<div class="hint">Slots this USN into the next free seat in the rooms already allotted &mdash; no reshuffle.</div>' +
+        '</div>' +
+        '<div class="field"><label>Remove a student (drop-out)</label>' +
+          (S.removeStudentError?('<div class="error-msg">'+esc(S.removeStudentError)+'</div>'):'') +
+          '<div style="display:flex; gap:8px;"><input id="removeStudentUsn" type="text" maxlength="10" placeholder="3BR24AI099" style="font-family:var(--font-mono); text-transform:uppercase;"><button class="btn btn-danger btn-sm" onclick="App.removeStudentFromSeating()">Remove</button></div>' +
+          '<div class="hint">Frees up that seat; everyone else keeps their existing bench.</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  return '' +
+  '<div class="card">' +
+    '<h3>1. Choose course</h3>' +
+    '<select onchange="App.setSeatingCourse(this.value)">'+courseOpts+'</select>' +
+    '<div class="hint" style="margin-top:8px;">Batch: 20'+esc(course.year)+' &middot; Branches: '+esc(course.branches.join(', ')||'none set')+' &middot; '+esc(course.date||'no date')+' &middot; '+esc(sessionLabel(course.session))+(course.time?(' &middot; '+esc(formatTime12(course.time))):'')+'</div>' +
+  '</div>' +
+  '<div class="card">' +
+    '<h3>2. Seating strategy</h3>' +
+    '<div class="chip-group">' +
+      '<label class="chip'+(S.strategy==='same'?' checked':'')+'"><input type="radio" name="strat" '+(S.strategy==='same'?'checked':'')+' onchange="App.setStrategy(&#39;same&#39;)"> Same branch together</label>' +
+      '<label class="chip'+(S.strategy==='mixed'?' checked':'')+'"><input type="radio" name="strat" '+(S.strategy==='mixed'?'checked':'')+' onchange="App.setStrategy(&#39;mixed&#39;)"> Mix branches per bench</label>' +
+    '</div>' +
+    '<div class="hint" style="margin-top:8px;">Mixed mode interleaves students from every selected branch seat-by-seat, so neighbours are rarely from the same branch.</div>' +
+  '</div>' +
+  '<div class="card">' +
+    '<h3>3. Select rooms</h3>' +
+    roomsHTML +
+    '<div class="hint" style="margin-top:10px;">Selected: '+selectedCount+' room(s), '+selectedCapacity+' seats total.</div>' +
+  '</div>' +
+  '<div class="card">' +
+    '<h3>4. Upload student list</h3>' +
+    (course.branches.length===0
+      ? '<div class="info-msg">This course has no branches selected. Edit branches in the Courses tab first.</div>'
+      : '<p class="hint" style="margin-bottom:14px;">Upload one CSV or Excel file per branch. Each file must contain a column named <b>USN</b>, and should include a <b>Name</b> column so student names appear on seat slips. Each file must only contain USNs from that branch.</p>' + branchFilesHTML) +
+    capacityWarning +
+  '</div>' +
+  '<button class="btn btn-stamp" '+(canGenerate?'':'disabled')+' onclick="App.generateSeating()">'+(S.generating?'Generating…':'Generate seating')+'</button>' +
+  resultHTML;
+}
+
+function branchFileRowHTML(branch, course){
+  var entry = S.csvFiles[branch];
+  var status = '';
+  if(entry){
+    if(entry.error){
+      status = '<div class="error-msg">'+esc(entry.error)+'</div>';
+    } else if(entry.result){
+      var res = entry.result;
+      if(res.wrongBranch.length>0){
+        var actual = res.wrongBranchSet.join(', ');
+        status = '<div class="error-msg">This file does not match branch <b>'+esc(branch)+'</b>. It contains '+res.wrongBranch.length+' USN(s) from '+esc(actual||'another branch')+'. Please upload the correct '+esc(branch)+' branch file here.</div>';
+      } else if(res.valid.length===0){
+        status = '<div class="error-msg">No valid '+esc(branch)+' USNs were found in this file. Check the USN column and format.</div>';
+      } else {
+        status = '<div class="ok-msg">'+res.valid.length+' '+esc(branch)+' student(s) parsed and eligible.' +
+          (res.outOfYear.length ? (' '+res.outOfYear.length+' skipped — not from batch 20'+esc(course.year)+'.') : '') +
+          (res.invalid.length ? (' '+res.invalid.length+' row(s) skipped — invalid USN format.') : '') +
+        '</div>';
+      }
+    }
+  }
+  return '' +
+  '<div class="field">' +
+    '<label>'+esc(branch)+' branch &mdash; USN list</label>' +
+    '<input type="file" accept=".csv,.xlsx,.xls" onchange="App.handleBranchFile(&#39;'+branch+'&#39;, this.files[0])">' +
+    (entry && entry.fileName ? '<div class="hint">File: '+esc(entry.fileName)+'</div>' : '') +
+    status +
+  '</div>';
+}
+
+/* ---------------- after-render focus fix ---------------- */
+function afterRenderHooks(){
+  var usnInput = document.getElementById('usnInput');
+  if(usnInput){
+    usnInput.addEventListener('keydown', function(e){ if(e.key==='Enter') App.studentSubmit(); });
+    usnInput.addEventListener('input', function(e){ e.target.value = e.target.value.toUpperCase(); });
+  }
+  var adminPass = document.getElementById('adminPass');
+  if(adminPass){
+    adminPass.addEventListener('keydown', function(e){ if(e.key==='Enter') App.adminSubmit(); });
+  }
+}
+
+/* ---------------- CSV / Excel parsing (one file per branch) ---------------- */
+function processBranchRows(rows, course, expectedBranch){
+  var valid = [], invalid = [], wrongBranch = [], outOfYear = [], wrongBranchSet = {}, names = {};
+  var seen = {};
+  rows.forEach(function(row){
+    var usnRaw = null, nameRaw = null;
+    Object.keys(row).forEach(function(k){
+      if(!k) return;
+      var kl = k.trim().toLowerCase();
+      if(kl==='usn') usnRaw = row[k];
+      else if(kl==='name' || kl==='student name' || kl==='full name') nameRaw = row[k];
+    });
+    if(usnRaw==null || String(usnRaw).trim()==='') return;
+    var usn = String(usnRaw).trim().toUpperCase();
+    if(seen[usn]) return;
+    seen[usn] = true;
+    var branch = getBranch(usn);
+    var year = getYear(usn);
+    if(!branch){ invalid.push(usn); return; }
+    if(branch !== expectedBranch){ wrongBranch.push(usn); wrongBranchSet[branch] = true; return; }
+    if(course.year && year !== course.year){ outOfYear.push(usn); return; }
+    valid.push(usn);
+    names[usn] = nameRaw!=null ? String(nameRaw).trim() : '';
+  });
+  return { valid: valid, invalid: invalid, wrongBranch: wrongBranch, outOfYear: outOfYear, wrongBranchSet: Object.keys(wrongBranchSet), names: names };
+}
+
+/* ---------------- seating algorithm ---------------- */
+function runSeatingAlgorithm(course, strategy, roomIds, csvParsed){
+  var rooms = roomIds.map(roomById).filter(Boolean).sort(function(a,b){
+    if(a.block!==b.block) return a.block<b.block?-1:1;
+    return String(a.roomNumber).localeCompare(String(b.roomNumber), undefined, {numeric:true});
+  });
+
+  var ordered = [];
+  if(strategy==='same'){
+    course.branches.forEach(function(b){
+      if(csvParsed.byBranch[b]) ordered = ordered.concat(csvParsed.byBranch[b].slice().sort());
+    });
+  } else {
+    var queues = course.branches.filter(function(b){return csvParsed.byBranch[b] && csvParsed.byBranch[b].length;})
+      .map(function(b){ return csvParsed.byBranch[b].slice().sort(); });
+    var remaining = true;
+    while(remaining){
+      remaining = false;
+      for(var i=0;i<queues.length;i++){
+        if(queues[i].length){ ordered.push(queues[i].shift()); remaining = true; }
+      }
+    }
+  }
+
+  var seatMap = {};
+  var rows = [];
+  var idx = 0;
+  for(var ri=0; ri<rooms.length && idx<ordered.length; ri++){
+    var room = rooms[ri];
+    for(var r=1; r<=room.rows && idx<ordered.length; r++){
+      for(var c=1; c<=room.cols && idx<ordered.length; c++){
+        for(var s=1; s<=room.perBench && idx<ordered.length; s++){
+          var usn = ordered[idx++];
+          seatMap[usn] = { roomId: room.id, row:r, col:c, seat:s };
+          rows.push({ usn: usn, branch: getBranch(usn), roomLabel: room.block+' — Room '+room.roomNumber, row:r, col:c, seat:s });
+        }
+      }
+    }
+  }
+  var unseated = ordered.slice(idx);
+  return { seatMap: seatMap, rows: rows, unseated: unseated, roomsUsed: rooms.map(function(r){return r.id;}) };
+}
+
+/* ---------------- student lookup across all courses ---------------- */
+async function findStudentSlips(usn){
+  var slips = [];
+  for(var i=0;i<COURSES.length;i++){
+    var course = COURSES[i];
+    var assign = await getAssignment(course.id);
+    if(!assign || !assign.seatMap || !assign.seatMap[usn]) continue;
+    var seat = assign.seatMap[usn];
+    var room = roomById(seat.roomId);
+    var studentName = (assign.names && assign.names[usn]) || '';
+    slips.push({ usn: usn, name: studentName, branch: getBranch(usn), course: course, room: room, seat: seat });
+  }
+  return slips;
+}
+
+/* ---------------- App (event handlers) ---------------- */
+var App = {
+  go: function(screen){ S.screen = screen; render(); },
+  goHome: goHome,
+
+  setAdminTab: function(t){ S.adminTab = t; S.roomFormError=''; S.courseFormError=''; render(); },
+  setBlock: function(b){ S.selectedBlock = b; render(); },
+
+  studentSubmit: async function(){
+    var el = document.getElementById('usnInput');
+    var usn = (el ? el.value : S.studentUsn).trim().toUpperCase();
+    S.studentUsn = usn;
+    if(!isValidUSN(usn)){
+      S.loginError = 'That doesn\'t look like a valid USN. Expected format: 3BR + year + branch code + roll number, e.g. 3BR24AI092.';
+      render();
+      return;
+    }
+    S.loginError = '';
+    S.screen = 'studentResult';
+    S.studentSlips = null;
+    render();
+    var slips = await findStudentSlips(usn);
+    S.studentSlips = slips;
+    render();
+  },
+
+  adminSubmit: async function(){
+    if(Date.now() < LOCK_UNTIL_TS){
+      S.adminLoginError = 'Too many failed attempts. Please wait a moment and try again.';
+      render();
+      return;
+    }
+    var el = document.getElementById('adminPass');
+    var pass = el ? el.value : '';
+    if(pass !== ADMIN_PASSWORD){
+      FAILED_LOGIN_COUNT++;
+      if(FAILED_LOGIN_COUNT >= 5){
+        LOCK_UNTIL_TS = Date.now() + 30000;
+        FAILED_LOGIN_COUNT = 0;
+        S.adminLoginError = 'Too many failed attempts. Locked for 30 seconds.';
+      } else {
+        S.adminLoginError = 'Incorrect password.';
+      }
+      render();
+      return;
+    }
+    FAILED_LOGIN_COUNT = 0;
+    S.adminLoginError = '';
+    S.isAdmin = true;
+    S.screen = 'adminDashboard';
+    S.adminTab = 'overview';
+    var rememberEl = document.getElementById('adminRememberMe');
+    try{
+      if(rememberEl && rememberEl.checked){ localStorage.setItem('adminRemember', '1'); }
+      else{ localStorage.removeItem('adminRemember'); }
+    }catch(e){ /* localStorage unavailable — remember-me just won't persist */ }
+    await refreshAssignCache();
+    render();
+  },
+  adminLogout: function(){
+    S.isAdmin=false;
+    try{ localStorage.removeItem('adminRemember'); }catch(e){ /* ignore */ }
+    goHome();
+  },
+
+  addRoom: async function(){
+    var num = (document.getElementById('roomNumber').value||'').trim();
+    var rows = parseInt(document.getElementById('roomRows').value,10);
+    var cols = parseInt(document.getElementById('roomCols').value,10);
+    var perBench = parseInt(document.getElementById('roomPerBench').value,10);
+    var status = document.getElementById('roomStatus').value;
+    if(!num){ S.roomFormError = 'Room number is required.'; render(); return; }
+    if(!rows || rows<1 || !cols || cols<1){ S.roomFormError = 'Rows and columns must be at least 1.'; render(); return; }
+    var dup = ROOMS.some(function(r){ return r.block===S.selectedBlock && r.roomNumber.toLowerCase()===num.toLowerCase(); });
+    if(dup){ S.roomFormError = 'Room '+num+' already exists in '+S.selectedBlock+'.'; render(); return; }
+    ROOMS.push({ id: uid('room_'), block: S.selectedBlock, roomNumber: num, rows: rows, cols: cols, perBench: perBench, status: status });
+    S.roomFormError = '';
+    var ok = await saveRooms();
+    if(!ok){ S.roomFormError = 'Could not save — please try again.'; }
+    render();
+  },
+  setRoomStatus: async function(id, status){
+    var r = roomById(id); if(!r) return;
+    r.status = status;
+    await saveRooms();
+    render();
+  },
+  deleteRoom: async function(id){
+    if(!confirm('Delete this room? This cannot be undone.')) return;
+    ROOMS = ROOMS.filter(function(r){return r.id!==id;});
+    delete S.selectedRoomIds[id];
+    await saveRooms();
+    render();
+  },
+
+  toggleCourseBranch: function(b){
+    S.courseBranchSel[b] = !S.courseBranchSel[b];
+    render();
+  },
+  updateCourseForm: function(field, value){
+    S.courseForm[field] = field==='code' ? value.toUpperCase() : value;
+    render();
+  },
+  updateNewBatchValue: function(value){
+    S.newBatchValue = value.replace(/[^0-9]/g,'').slice(0,2);
+    render();
+  },
+  addBatch: async function(){
+    var v = (S.newBatchValue||'').trim();
+    if(!/^\d{2}$/.test(v)){ S.newBatchError = 'Enter a 2-digit admission year code, e.g. 27.'; render(); return; }
+    if(allBatchYears().indexOf(v)!==-1){ S.newBatchError = 'Batch 20'+v+' already exists.'; render(); return; }
+    CUSTOM_BATCHES.push(v);
+    var ok = await saveCustomBatches();
+    if(!ok){ S.newBatchError = 'Could not save — please try again.'; render(); return; }
+    S.newBatchError = '';
+    S.newBatchValue = '';
+    S.courseForm.year = v;
+    render();
+  },
+  addCourse: async function(){
+    var name = (S.courseForm.name||'').trim();
+    var code = (S.courseForm.code||'').trim().toUpperCase();
+    var year = S.courseForm.year;
+    var date = S.courseForm.date;
+    var session = S.courseForm.session;
+    var time = S.courseForm.time;
+    var branches = Object.keys(S.courseBranchSel).filter(function(b){return S.courseBranchSel[b];});
+    if(!name || !code){ S.courseFormError = 'Course name and code are required.'; render(); return; }
+    if(branches.length===0){ S.courseFormError = 'Select at least one branch for this course.'; render(); return; }
+    var dup = COURSES.some(function(c){ return c.code.toLowerCase()===code.toLowerCase(); });
+    if(dup){ S.courseFormError = 'Course code '+code+' already exists.'; render(); return; }
+    COURSES.push({ id: uid('course_'), name: name, code: code, year: year, date: date, session: session, time: time, branches: branches });
+    S.courseFormError = '';
+    S.courseBranchSel = {};
+    S.courseForm = { name:'', code:'', year: year, date:'', session:'FN', time:'' };
+    var ok = await saveCourses();
+    if(!ok){ S.courseFormError = 'Could not save — please try again.'; }
+    render();
+  },
+  deleteCourse: async function(id){
+    if(!confirm('Delete this course and its published seating?')) return;
+    COURSES = COURSES.filter(function(c){return c.id!==id;});
+    await saveCourses();
+    await deleteAssignment(id);
+    if(S.selectedCourseId===id) S.selectedCourseId='';
+    render();
+  },
+
+  setSeatingCourse: function(id){ S.selectedCourseId = id; S.csvFiles={}; S.seatingResult=null; render(); },
+  setStrategy: function(s){ S.strategy = s; render(); },
+  toggleRoomSelect: function(id){
+    S.selectedRoomIds[id] = !S.selectedRoomIds[id];
+    render();
+  },
+
+  handleBranchFile: function(branch, file){
+    if(!file) return;
+    var course = courseById(S.selectedCourseId);
+    if(!course) return;
+    if(!S.csvFiles[branch]) S.csvFiles[branch] = {};
+    S.csvFiles[branch].fileName = file.name;
+    S.csvFiles[branch].error = '';
+    S.csvFiles[branch].result = null;
+    var name = file.name.toLowerCase();
+    if(name.endsWith('.csv')){
+      Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: function(results){
+          S.csvFiles[branch].result = processBranchRows(results.data, course, branch);
+          render();
+        },
+        error: function(){ S.csvFiles[branch].error = 'Could not read this file.'; render(); }
+      });
+    } else {
+      var reader = new FileReader();
+      reader.onload = function(e){
+        try{
+          var wb = XLSX.read(e.target.result, {type:'array'});
+          var sheet = wb.Sheets[wb.SheetNames[0]];
+          var rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+          S.csvFiles[branch].result = processBranchRows(rows, course, branch);
+        }catch(err){ S.csvFiles[branch].error = 'Could not read this file.'; }
+        render();
+      };
+      reader.onerror = function(){ S.csvFiles[branch].error = 'Could not read this file.'; render(); };
+      reader.readAsArrayBuffer(file);
+    }
+    render();
+  },
+
+  generateSeating: async function(){
+    var course = courseById(S.selectedCourseId);
+    if(!course) return;
+    var roomIds = Object.keys(S.selectedRoomIds).filter(function(id){return S.selectedRoomIds[id];});
+    if(roomIds.length===0) return;
+
+    var combined = { valid: [], byBranch: {}, names: {} };
+    var ready = course.branches.length>0;
+    course.branches.forEach(function(b){
+      var entry = S.csvFiles[b];
+      var res = entry && entry.result;
+      if(!res || res.wrongBranch.length>0 || res.valid.length===0){ ready = false; return; }
+      combined.byBranch[b] = res.valid.slice();
+      combined.valid = combined.valid.concat(res.valid);
+      Object.keys(res.names||{}).forEach(function(usn){ combined.names[usn] = res.names[usn]; });
+    });
+    if(!ready || combined.valid.length===0) return;
+
+    var existing = await getAssignment(course.id);
+    if(existing && Object.keys(existing.seatMap||{}).length){
+      if(!confirm('Seating already exists for this course. Regenerate and overwrite it?')) return;
+    }
+
+    S.generating = true; render();
+    var result = runSeatingAlgorithm(course, S.strategy, roomIds, combined);
+    result.rows.forEach(function(row){ row.name = combined.names[row.usn] || ''; });
+    var ok = await saveAssignment(course.id, { seatMap: result.seatMap, names: combined.names, roomsUsed: result.roomsUsed, generatedAt: new Date().toISOString() });
+    S.generating = false;
+    S.seatingResult = {
+      courseId: course.id,
+      seatedCount: result.rows.length,
+      unseated: result.unseated,
+      roomsUsed: result.roomsUsed,
+      rows: result.rows
+    };
+    if(!ok){ alert('Something went wrong saving the seating. Please try again.'); }
+    render();
+  },
+
+  downloadSeatingCSV: function(){
+    var res = S.seatingResult;
+    if(!res) return;
+    var course = courseById(res.courseId);
+    var lines = ['USN,Name,Branch,Room,Row,Col,Seat'];
+    res.rows.forEach(function(row){
+      lines.push([row.usn, row.name||'', row.branch, row.roomLabel, row.row, row.col, row.seat].map(function(v){
+        var s = String(v==null?'':v);
+        return /[",\n]/.test(s) ? ('"'+s.replace(/"/g,'""')+'"') : s;
+      }).join(','));
+    });
+    var blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (course ? course.code : 'seating') + '_seating.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  clearSeating: async function(){
+    var course = courseById(S.selectedCourseId);
+    if(!course) return;
+    if(!confirm('Clear the published seating for '+course.code+'? Students will no longer find a seat for this course.')) return;
+    await deleteAssignment(course.id);
+    ASSIGN_CACHE[course.id] = null;
+    S.seatingResult = null;
+    render();
+  },
+
+  addStudentToSeating: async function(){
+    S.addStudentError = '';
+    var course = courseById(S.selectedCourseId);
+    var res = S.seatingResult;
+    if(!course || !res || res.courseId !== course.id) return;
+    var el = document.getElementById('addStudentUsn');
+    var nameEl = document.getElementById('addStudentName');
+    var usn = (el ? el.value : '').trim().toUpperCase();
+    var studentName = (nameEl ? nameEl.value : '').trim();
+    if(!isValidUSN(usn)){ S.addStudentError = 'Not a valid USN.'; render(); return; }
+    var branch = getBranch(usn);
+    var year = getYear(usn);
+    if(course.year && year !== course.year){ S.addStudentError = 'This USN is not from the 20'+course.year+' batch set for this course.'; render(); return; }
+    if(course.branches.indexOf(branch)===-1){ S.addStudentError = 'This USN\'s branch ('+branch+') is not selected for this course.'; render(); return; }
+
+    var assign = await getAssignment(course.id);
+    if(!assign) assign = { seatMap:{}, names:{}, roomsUsed: res.roomsUsed, generatedAt: new Date().toISOString() };
+    if(!assign.names) assign.names = {};
+    if(assign.seatMap[usn]){ S.addStudentError = 'This USN already has a seat for this course.'; render(); return; }
+
+    var rooms = (assign.roomsUsed||[]).map(roomById).filter(Boolean).sort(function(a,b){
+      if(a.block!==b.block) return a.block<b.block?-1:1;
+      return String(a.roomNumber).localeCompare(String(b.roomNumber), undefined, {numeric:true});
+    });
+    var taken = {};
+    Object.keys(assign.seatMap).forEach(function(u){
+      var s = assign.seatMap[u];
+      taken[s.roomId+'_'+s.row+'_'+s.col+'_'+s.seat] = true;
+    });
+    var placed = null;
+    for(var ri=0; ri<rooms.length && !placed; ri++){
+      var room = rooms[ri];
+      for(var r=1; r<=room.rows && !placed; r++){
+        for(var c=1; c<=room.cols && !placed; c++){
+          for(var s=1; s<=room.perBench && !placed; s++){
+            var key = room.id+'_'+r+'_'+c+'_'+s;
+            if(!taken[key]){ placed = { roomId: room.id, row:r, col:c, seat:s, roomLabel: room.block+' — Room '+room.roomNumber }; }
+          }
+        }
+      }
+    }
+    if(!placed){ S.addStudentError = 'No free seat left in the rooms allotted to this course. Add another room first.'; render(); return; }
+
+    assign.seatMap[usn] = { roomId: placed.roomId, row: placed.row, col: placed.col, seat: placed.seat };
+    if(studentName) assign.names[usn] = studentName;
+    var ok = await saveAssignment(course.id, assign);
+    if(!ok){ S.addStudentError = 'Could not save — please try again.'; render(); return; }
+    ASSIGN_CACHE[course.id] = assign;
+    res.seatedCount++;
+    res.rows.push({ usn: usn, name: studentName, branch: branch, roomLabel: placed.roomLabel, row: placed.row, col: placed.col, seat: placed.seat });
+    res.unseated = (res.unseated||[]).filter(function(u){return u!==usn;});
+    if(el) el.value = '';
+    if(nameEl) nameEl.value = '';
+    render();
+  },
+
+  removeStudentFromSeating: async function(){
+    S.removeStudentError = '';
+    var course = courseById(S.selectedCourseId);
+    var res = S.seatingResult;
+    if(!course || !res || res.courseId !== course.id) return;
+    var el = document.getElementById('removeStudentUsn');
+    var usn = (el ? el.value : '').trim().toUpperCase();
+    if(!isValidUSN(usn)){ S.removeStudentError = 'Not a valid USN.'; render(); return; }
+
+    var assign = await getAssignment(course.id);
+    if(!assign || !assign.seatMap || !assign.seatMap[usn]){ S.removeStudentError = 'This USN has no seat in this course.'; render(); return; }
+
+    delete assign.seatMap[usn];
+    if(assign.names) delete assign.names[usn];
+    var ok = await saveAssignment(course.id, assign);
+    if(!ok){ S.removeStudentError = 'Could not save — please try again.'; render(); return; }
+    ASSIGN_CACHE[course.id] = assign;
+    res.seatedCount = Math.max(0, res.seatedCount - 1);
+    res.rows = res.rows.filter(function(row){ return row.usn !== usn; });
+    if(el) el.value = '';
+    render();
+  },
+
+  resetAll: async function(){
+    if(!confirm('This wipes ALL rooms, courses and published seating for every student. Continue?')) return;
+    if(!confirm('Really sure? This cannot be undone.')) return;
+    var courseIds = COURSES.map(function(c){return c.id;});
+    ROOMS = []; COURSES = [];
+    await saveRooms(); await saveCourses();
+    for(var i=0;i<courseIds.length;i++){ await deleteAssignment(courseIds[i]); }
+    S.selectedRoomIds = {}; S.seatingResult = null;
+    render();
+  }
+};
+window.App = App;
+
+/* ---------------- boot ---------------- */
+loadAll().then(function(){ return refreshAssignCache(); }).then(render);
+render();
+
+})();
+</script>
+</body>
+</html>
