@@ -170,6 +170,7 @@
   .room-item .rn{font-family:var(--font-mono); font-weight:700; font-size:15px;}
   .room-item .meta{font-size:12px; color:var(--muted); margin:5px 0 10px;}
   .room-item .item-actions{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+  .room-edit{border-top:1px dashed var(--line); margin-top:12px; padding-top:12px;}
 
   /* slip / ticket for student result */
   .slip{
@@ -355,6 +356,7 @@ var S = {
   loginError: '',
   adminLoginError: '',
   selectedBlock: BLOCKS[0],
+  editingRoomId: '',
   roomFormError: '',
   courseFormError: '',
   courseBranchSel: {},
@@ -731,12 +733,35 @@ function roomItemHTML(r){
     '<div class="meta">Floor '+esc(r.floorNumber||'—')+' &middot; '+r.rows+' rows &times; '+r.cols+' cols &middot; '+r.perBench+'/bench &middot; capacity '+cap+'</div>' +
     bookingsLine +
     '<div class="item-actions">' +
+      '<button class="btn btn-ghost btn-sm" onclick="App.editRoom(&#39;'+r.id+'&#39;)">Edit</button>' +
       '<select class="btn-sm" style="border:1.5px solid var(--line); border-radius:4px;" onchange="App.setRoomStatus(&#39;'+r.id+'&#39;, this.value)">' +
         '<option value="free"'+(r.status==='free'?' selected':'')+'>Free</option>' +
         '<option value="maintenance"'+(r.status==='maintenance'?' selected':'')+'>Maintenance</option>' +
       '</select>' +
       '<button class="btn btn-danger btn-sm" onclick="App.deleteRoom(&#39;'+r.id+'&#39;)">Delete</button>' +
     '</div>' +
+    (S.editingRoomId===r.id ? roomEditHTML(r) : '') +
+  '</div>';
+}
+
+function roomEditHTML(r){
+  var blockOpts = BLOCKS.map(function(block){
+    return '<option value="'+esc(block)+'"'+(block===r.block?' selected':'')+'>'+esc(block)+'</option>';
+  }).join('');
+  return '<div class="room-edit">' +
+    '<div class="row">' +
+      '<div class="field"><label>Block</label><select id="editRoomBlock">'+blockOpts+'</select></div>' +
+      '<div class="field"><label>Floor number</label><input id="editRoomFloor" type="text" value="'+esc(r.floorNumber||'')+'"></div>' +
+      '<div class="field"><label>Room number</label><input id="editRoomNumber" type="text" value="'+esc(r.roomNumber)+'"></div>' +
+    '</div>' +
+    '<div class="row">' +
+      '<div class="field"><label>Rows</label><input id="editRoomRows" type="number" min="1" value="'+r.rows+'"></div>' +
+      '<div class="field"><label>Columns</label><input id="editRoomCols" type="number" min="1" max="4" value="'+r.cols+'"></div>' +
+      '<div class="field"><label>Students / bench</label><select id="editRoomPerBench"><option value="1"'+(r.perBench===1?' selected':'')+'>1</option><option value="2"'+(r.perBench===2?' selected':'')+'>2</option><option value="3"'+(r.perBench===3?' selected':'')+'>3</option></select></div>' +
+      '<div class="field"><label>Status</label><select id="editRoomStatus"><option value="free"'+(r.status==='free'?' selected':'')+'>Free</option><option value="maintenance"'+(r.status==='maintenance'?' selected':'')+'>Under maintenance</option></select></div>' +
+    '</div>' +
+    '<button class="btn btn-stamp btn-sm" onclick="App.saveRoomEdit(&#39;'+r.id+'&#39;)">Save changes</button> ' +
+    '<button class="btn btn-ghost btn-sm" onclick="App.cancelRoomEdit()">Cancel</button>' +
   '</div>';
 }
 
@@ -776,6 +801,7 @@ function coursesTabHTML(){
     '</div>' +
     '<div class="row">' +
       '<div class="field"><label>Admission batch this exam is for</label><select onchange="App.updateCourseForm(&#39;year&#39;, this.value)">'+yearOpts+'</select>' +
+        '<div class="hint">Only students admitted in this batch will be eligible.</div></div>' +
       '<div class="field"><label>Exam date</label><input type="date" value="'+esc(S.courseForm.date)+'" oninput="App.updateCourseForm(&#39;date&#39;, this.value)"></div>' +
     '</div>' +
     '<div class="row">' +
@@ -1106,6 +1132,45 @@ var App = {
     if(!ok){ S.roomFormError = 'Could not save — please try again.'; }
     render();
   },
+  editRoom: function(id){
+    S.editingRoomId = id;
+    S.roomFormError = '';
+    render();
+  },
+  cancelRoomEdit: function(){
+    S.editingRoomId = '';
+    S.roomFormError = '';
+    render();
+  },
+  saveRoomEdit: async function(id){
+    var room = roomById(id);
+    if(!room) return;
+    var block = document.getElementById('editRoomBlock').value;
+    var floorNumber = (document.getElementById('editRoomFloor').value||'').trim();
+    var roomNumber = (document.getElementById('editRoomNumber').value||'').trim();
+    var rows = parseInt(document.getElementById('editRoomRows').value,10);
+    var cols = parseInt(document.getElementById('editRoomCols').value,10);
+    var perBench = parseInt(document.getElementById('editRoomPerBench').value,10);
+    var status = document.getElementById('editRoomStatus').value;
+    if(!roomNumber){ S.roomFormError = 'Room number is required.'; render(); return; }
+    if(!rows || rows<1 || !cols || cols<1){ S.roomFormError = 'Rows and columns must be at least 1.'; render(); return; }
+    var dup = ROOMS.some(function(existing){
+      return existing.id!==id && existing.block===block && existing.roomNumber.toLowerCase()===roomNumber.toLowerCase();
+    });
+    if(dup){ S.roomFormError = 'Room '+roomNumber+' already exists in '+block+'.'; render(); return; }
+    room.block = block;
+    room.floorNumber = floorNumber;
+    room.roomNumber = roomNumber;
+    room.rows = rows;
+    room.cols = cols;
+    room.perBench = perBench;
+    room.status = status;
+    var ok = await saveRooms();
+    if(!ok){ S.roomFormError = 'Could not save — please try again.'; render(); return; }
+    S.editingRoomId = '';
+    S.roomFormError = '';
+    render();
+  },
   setRoomStatus: async function(id, status){
     var r = roomById(id); if(!r) return;
     r.status = status;
@@ -1115,6 +1180,7 @@ var App = {
   deleteRoom: async function(id){
     if(!confirm('Delete this room? This cannot be undone.')) return;
     ROOMS = ROOMS.filter(function(r){return r.id!==id;});
+    if(S.editingRoomId===id) S.editingRoomId = '';
     delete S.selectedRoomIds[id];
     await saveRooms();
     render();
