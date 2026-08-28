@@ -512,7 +512,7 @@ function topbarHTML(){
   return '' +
   '<div class="topbar">' +
     '<div class="brand" onclick="App.goHome()">' +
-      '<span class="name">BITM Digital Seating Slip</span>' +
+      '<span class="name">BITM Digital Exam Seating</span>' +
     '</div>' +
     '<div class="top-actions">' + right + '</div>' +
   '</div>';
@@ -531,14 +531,10 @@ function homeHTML(){
       '<div class="ticket" onclick="App.go(&#39;studentLogin&#39;)">' +
         '<span class="perf" style="left:0"></span>' +
         '<span class="num">STUDENT</span>' +
-        '<h3>Student login</h3>' +
-        '<p>View your assigned examination room, bench and seat number using your USN.</p>' +
         '<button class="btn btn-stamp btn-block">Find my seat</button>' +
       '</div>' +
       '<div class="ticket" onclick="App.go(&#39;adminLogin&#39;)">' +
         '<span class="num">ADMIN</span>' +
-        '<h3>Examination cell login</h3>' +
-        '<p>Manage blocks and rooms, configure courses, and generate seating arrangements.</p>' +
         '<button class="btn btn-ghost btn-block">Admin login</button>' +
       '</div>' +
     '</div>' +
@@ -635,7 +631,6 @@ function adminLoginHTML(){
   var locked = Date.now() < LOCK_UNTIL_TS;
   return '' +
   '<div class="wrap narrow">' +
-    '<span class="eyebrow">Examination cell access</span>' +
     '<h2>Admin login</h2>' +
     '<p class="lead" style="margin-bottom:22px;">Manage blocks, rooms, courses and seating arrangements.</p>' +
     (S.adminLoginError ? '<div class="error-msg">'+esc(S.adminLoginError)+'</div>' : '') +
@@ -643,7 +638,6 @@ function adminLoginHTML(){
       '<div class="field">' +
         '<label for="adminPass">Admin password</label>' +
         '<input id="adminPass" type="password" placeholder="Enter admin password" autocomplete="off"'+(locked?' disabled':'')+'>' +
-        '<div class="hint">Authorized examination cell personnel only.</div>' +
       '</div>' +
       '<label style="display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--ink-2); margin-bottom:16px; cursor:pointer;">' +
         '<input type="checkbox" id="adminRememberMe" checked style="width:auto;"> Remember me on this device' +
