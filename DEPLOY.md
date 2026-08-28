@@ -85,7 +85,7 @@ HTTPS by default, no server to maintain.
 Open your deployed URL and check, in order:
 1. Home page loads (no "Backend not configured" message — if you see that,
    double check step 2).
-2. Log in as admin with `Adminofbitm@2026`.
+2. Log in as admin with `AdminBitm@2026`.
 3. Add a room, add a course, upload a sample CSV, generate seating.
 4. Refresh the page — your room/course should still be there (confirms
    Supabase is actually persisting data, not just working in-memory).
