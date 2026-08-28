@@ -178,6 +178,8 @@
   .room-item .item-actions{display:flex; gap:7px; align-items:center; flex-wrap:wrap;}
   .room-item .item-actions .status-select{flex:1; min-width:105px;}
   .room-edit{border-top:1px dashed var(--line); margin-top:12px; padding-top:12px;}
+  .seating-block{border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:10px; background:#fbfdff;}
+  .seating-block-title{font-family:var(--font-mono); font-size:11px; font-weight:600; letter-spacing:.8px; text-transform:uppercase; color:var(--ink-2); margin-bottom:8px;}
 
   /* slip / ticket for student result */
   .slip{
@@ -363,6 +365,7 @@ var S = {
   loginError: '',
   adminLoginError: '',
   selectedBlock: BLOCKS[0],
+  roomViewBlock: 'all',
   editingRoomId: '',
   roomFormError: '',
   courseFormError: '',
@@ -693,15 +696,15 @@ function overviewTabHTML(){
 }
 
 function roomsTabHTML(){
-  var blockRooms = ROOMS.filter(function(r){return r.block===S.selectedBlock;});
-  var blockOpts = BLOCKS.map(function(b){return '<option value="'+esc(b)+'"'+(b===S.selectedBlock?' selected':'')+'>'+esc(b)+'</option>';}).join('');
+  var blockRooms = ROOMS.filter(function(r){return S.roomViewBlock==='all' || r.block===S.roomViewBlock;});
+  var blockOpts = '<option value="all"'+(S.roomViewBlock==='all'?' selected':'')+'>All blocks</option>' + BLOCKS.map(function(b){return '<option value="'+esc(b)+'"'+(b===S.roomViewBlock?' selected':'')+'>'+esc(b)+'</option>';}).join('');
   var list = blockRooms.length ? '<div class="room-list">' + blockRooms.map(roomItemHTML).join('') + '</div>'
-    : '<div class="empty-block"><div class="big">No rooms yet in '+esc(S.selectedBlock)+'</div><p>Add the first room using the form above.</p></div>';
+    : '<div class="empty-block"><div class="big">No rooms found</div><p>Add rooms to the college inventory or choose another block.</p></div>';
 
   return '' +
   '<div class="card">' +
-    '<h3>Select block</h3>' +
-    '<select onchange="App.setBlock(this.value)">' + blockOpts + '</select>' +
+    '<h3>View rooms by block</h3>' +
+    '<select onchange="App.setRoomViewBlock(this.value)">' + blockOpts + '</select>' +
   '</div>' +
   '<div class="card">' +
     '<h3>Add room to '+esc(S.selectedBlock)+'</h3>' +
@@ -841,12 +844,13 @@ function seatingTabHTML(){
   var byBlock = {};
   eligibleRooms.forEach(function(r){ (byBlock[r.block]=byBlock[r.block]||[]).push(r); });
 
-  var roomsHTML = Object.keys(byBlock).length ? Object.keys(byBlock).map(function(block){
+  var orderedBlocks = BLOCKS.filter(function(block){ return byBlock[block]; });
+  var roomsHTML = orderedBlocks.length ? orderedBlocks.map(function(block){
     var items = byBlock[block].map(function(r){
       var checked = !!S.selectedRoomIds[r.id];
-      return '<label class="chip'+(checked?' checked':'')+'"><input type="checkbox" '+(checked?'checked':'')+' onchange="App.toggleRoomSelect(&#39;'+r.id+'&#39;)"> '+esc(r.roomNumber)+' &middot; cap '+roomCapacity(r)+'</label>';
+      return '<label class="chip'+(checked?' checked':'')+'"><input type="checkbox" '+(checked?'checked':'')+' onchange="App.toggleRoomSelect(&#39;'+r.id+'&#39;)"> '+esc(r.roomNumber)+' &middot; Floor '+esc(r.floorNumber||'—')+' &middot; cap '+roomCapacity(r)+'</label>';
     }).join('');
-    return '<div style="margin-bottom:12px;"><div class="hint" style="margin-bottom:6px; font-weight:600;">'+esc(block)+'</div><div class="chip-group">'+items+'</div></div>';
+    return '<div class="seating-block"><div class="seating-block-title">'+esc(block)+'</div><div class="chip-group">'+items+'</div></div>';
   }).join('') : '<div class="info-msg">No maintenance-free rooms exist yet. Add rooms in the Blocks &amp; Rooms tab.</div>';
 
   var selectedCount = Object.keys(S.selectedRoomIds).filter(function(id){return S.selectedRoomIds[id];}).length;
@@ -1069,6 +1073,7 @@ var App = {
 
   setAdminTab: function(t){ S.adminTab = t; S.roomFormError=''; S.courseFormError=''; render(); },
   setBlock: function(b){ S.selectedBlock = b; render(); },
+  setRoomViewBlock: function(b){ S.roomViewBlock = b; S.editingRoomId = ''; S.roomFormError = ''; render(); },
 
   studentSubmit: async function(){
     var el = document.getElementById('usnInput');
