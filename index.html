@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Digital Seating Slip — BITM</title>
+<title>BITM Digital Exam Seating</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -279,6 +279,20 @@
     .choice-row{gap:14px;}
     .ticket{padding:20px 16px;}
   }
+  .bitm-logo {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+ .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
 </style>
 </head>
 <body>
@@ -571,40 +585,36 @@ function render(){
 function goHome(){ S.screen='home'; S.studentSlips=null; S.studentSearched=false; render(); }
 
 /* ---------------- topbar ---------------- */
-function topbarHTML(){
-  var right = '';
-  if(S.isAdmin){
-    right = '<span class="tag">ADMIN SESSION</span><button class="linklike" onclick="App.adminLogout()">Log out</button>';
-  } else if(S.screen!=='home'){
-    right = '<button class="linklike" onclick="App.goHome()">&larr; Home</button>';
-  }
-  return '' +/* ---------------- topbar ---------------- */
-function topbarHTML(){
-  var right = '';
+function topbarHTML() {
+  let right = '';
 
-  if(S.isAdmin){
-    right = '<span class="tag">ADMIN SESSION</span>' +
-            '<button class="linklike" onclick="App.adminLogout()">Log out</button>';
-  } else if(S.screen !== 'home'){
-    right = '<button class="linklike" onclick="App.goHome()">&larr; Home</button>';
+  if (S.isAdmin) {
+    right = `
+      <span class="tag">ADMIN SESSION</span>
+      <button class="linklike" onclick="App.adminLogout()">Log out</button>
+    `;
+  } else if (S.screen !== 'home') {
+    right = `
+      <button class="linklike" onclick="App.goHome()">&larr; Home</button>
+    `;
   }
 
-  return '' +
-  '<div class="topbar">' +
+  return `
+    <div class="topbar">
+      <div class="brand" onclick="App.goHome()">
+        <img
+          src="images/bitmlogo.png"
+          alt="BITM Logo"
+          class="bitm-logo"
+        >
+        <span class="name">BITM Digital Exam Seating</span>
+      </div>
 
-    '<div class="brand" onclick="App.goHome()">' +
-
-      '<img src="images/bitm-logo.png" ' +
-      'alt="BITM Logo" class="bitm-logo">' +
-
-      '<span class="name">BITM Digital Exam Seating</span>' +
-
-    '</div>' +
-
-    '<div class="top-actions">' + right + '</div>' +
-
-  '</div>';
-}
+      <div class="top-actions">
+        ${right}
+      </div>
+    </div>
+  `;
 }
 
 /* ---------------- home ---------------- */
