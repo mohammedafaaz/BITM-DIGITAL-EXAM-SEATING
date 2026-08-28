@@ -495,7 +495,6 @@ function render(){
   else if(S.screen==='studentResult') html += studentResultHTML();
   else if(S.screen==='adminLogin') html += adminLoginHTML();
   else if(S.screen==='adminDashboard') html += adminDashboardHTML();
-  html += '<footer>&copy; BITM Examination Cell &middot; Digital Seating Arrangement System</footer>';
   root.innerHTML = html;
   afterRenderHooks();
 }
@@ -552,15 +551,11 @@ function homeHTML(){
 function studentLoginHTML(){
   return '' +
   '<div class="wrap narrow">' +
-    '<span class="eyebrow">Student lookup</span>' +
     '<h2>Enter your USN</h2>' +
-    '<p class="lead" style="margin-bottom:22px;">Format: 3BR + year (2 digits) + branch code + roll number. Example: 3BR24AI092.</p>' +
     (S.loginError ? '<div class="error-msg">'+esc(S.loginError)+'</div>' : '') +
     '<div class="card">' +
       '<div class="field">' +
-        '<label for="usnInput">University Seat Number</label>' +
         '<input id="usnInput" class="usn-input" type="text" maxlength="10" placeholder="3BR24AI092" value="'+esc(S.studentUsn)+'" autocomplete="off">' +
-        '<div class="hint">Branch codes in use: '+BRANCHES.join(', ')+'</div>' +
       '</div>' +
       '<button class="btn btn-stamp btn-block" onclick="App.studentSubmit()">Find my seat &rarr;</button>' +
     '</div>' +
