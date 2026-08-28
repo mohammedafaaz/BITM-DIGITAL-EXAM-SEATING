@@ -605,6 +605,7 @@ function slipHTML(slip){
         '<div class="slip-field"><div class="k">Session</div><div class="v">'+esc(sessionLabel(course.session))+'</div></div>' +
         '<div class="slip-field"><div class="k">Reporting time</div><div class="v mono">'+esc(formatTime12(course.time)||'—')+'</div></div>' +
         '<div class="slip-field"><div class="k">Block</div><div class="v">'+esc(room?room.block:'—')+'</div></div>' +
+        '<div class="slip-field"><div class="k">Floor No.</div><div class="v mono">'+esc(room?(room.floorNumber||'—'):'—')+'</div></div>' +
         '<div class="slip-field"><div class="k">Room No.</div><div class="v mono">'+esc(room?room.roomNumber:'—')+'</div></div>' +
         '<div class="slip-field"><div class="k">Bench</div><div class="v mono">R'+seat.row+' &middot; C'+seat.col+'</div></div>' +
         '<div class="slip-field"><div class="k">Seat</div><div class="v mono">'+seat.seat+' of '+(room?room.perBench:'—')+'</div></div>' +
@@ -713,6 +714,7 @@ function roomsTabHTML(){
     '<h3>Add room to '+esc(S.selectedBlock)+'</h3>' +
     (S.roomFormError ? '<div class="error-msg">'+esc(S.roomFormError)+'</div>' : '') +
     '<div class="row">' +
+      '<div class="field"><label>Floor number</label><input id="roomFloor" type="text" placeholder="e.g. 1"></div>' +
       '<div class="field"><label>Room number</label><input id="roomNumber" type="text" placeholder="e.g. 204"></div>' +
       '<div class="field"><label>Rows</label><input id="roomRows" type="number" min="1" value="6"></div>' +
       '<div class="field"><label>Columns</label><input id="roomCols" type="number" min="1" max="4" value="3"></div>' +
@@ -742,7 +744,7 @@ function roomItemHTML(r){
       '<span class="rn">Room '+esc(r.roomNumber)+'</span>' +
       '<span class="badge '+badgeCls+'">'+badgeLabel+'</span>' +
     '</div>' +
-    '<div class="meta">'+r.rows+' rows &times; '+r.cols+' cols &middot; '+r.perBench+'/bench &middot; capacity '+cap+'</div>' +
+    '<div class="meta">Floor '+esc(r.floorNumber||'—')+' &middot; '+r.rows+' rows &times; '+r.cols+' cols &middot; '+r.perBench+'/bench &middot; capacity '+cap+'</div>' +
     bookingsLine +
     '<div class="item-actions">' +
       '<select class="btn-sm" style="border:1.5px solid var(--line); border-radius:4px;" onchange="App.setRoomStatus(&#39;'+r.id+'&#39;, this.value)">' +
@@ -1108,6 +1110,7 @@ var App = {
   },
 
   addRoom: async function(){
+    var floorNumber = (document.getElementById('roomFloor').value||'').trim();
     var num = (document.getElementById('roomNumber').value||'').trim();
     var rows = parseInt(document.getElementById('roomRows').value,10);
     var cols = parseInt(document.getElementById('roomCols').value,10);
@@ -1117,7 +1120,7 @@ var App = {
     if(!rows || rows<1 || !cols || cols<1){ S.roomFormError = 'Rows and columns must be at least 1.'; render(); return; }
     var dup = ROOMS.some(function(r){ return r.block===S.selectedBlock && r.roomNumber.toLowerCase()===num.toLowerCase(); });
     if(dup){ S.roomFormError = 'Room '+num+' already exists in '+S.selectedBlock+'.'; render(); return; }
-    ROOMS.push({ id: uid('room_'), block: S.selectedBlock, roomNumber: num, rows: rows, cols: cols, perBench: perBench, status: status });
+    ROOMS.push({ id: uid('room_'), block: S.selectedBlock, floorNumber: floorNumber, roomNumber: num, rows: rows, cols: cols, perBench: perBench, status: status });
     S.roomFormError = '';
     var ok = await saveRooms();
     if(!ok){ S.roomFormError = 'Could not save — please try again.'; }
