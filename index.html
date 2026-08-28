@@ -148,6 +148,7 @@
   .badge.free{background:var(--ok-bg); color:var(--ok);}
   .badge.full{background:var(--warn-bg); color:var(--warn);}
   .badge.maintenance{background:var(--danger-bg); color:var(--danger);}
+  .badge.completed{background:var(--paper-2); color:var(--muted);}
 
   .tabs{display:flex; gap:4px; border-bottom:1.5px solid var(--line); margin-bottom:24px; flex-wrap:wrap;}
   .tab{
@@ -425,6 +426,20 @@ function formatTime12(t){
   var h12 = h % 12; if(h12===0) h12 = 12;
   return h12+':'+min+' '+ampm;
 }
+function examStatus(course){
+  if(!course || !course.date || !course.time) return null;
+  var dateParts = String(course.date).split('-').map(Number);
+  var timeParts = String(course.time).split(':').map(Number);
+  if(dateParts.length!==3 || timeParts.length<2 || dateParts.some(isNaN) || timeParts.some(isNaN)) return null;
+  var start = new Date(dateParts[0], dateParts[1]-1, dateParts[2], timeParts[0], timeParts[1]);
+  if(isNaN(start.getTime())) return null;
+  var completedAt = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+  return { completed: Date.now() >= completedAt.getTime(), completedAt: completedAt };
+}
+function examStatusHTML(course){
+  var status = examStatus(course);
+  return status && status.completed ? '<span class="badge completed">Completed</span>' : '';
+}
 
 /* ---------------- storage layer ---------------- */
 /* Mobile connections can be flaky: a save sometimes actually succeeds on
@@ -610,6 +625,7 @@ function slipHTML(slip){
   '<div class="slip">' +
     '<div class="slip-head">' +
       '<div><div class="course">'+esc(course.name)+'</div><div class="code">'+esc(course.code)+(course.date?(' &middot; '+esc(course.date)):'')+' &middot; '+esc(sessionLabel(course.session))+(course.time?(' &middot; '+esc(formatTime12(course.time))):'')+'</div></div>' +
+      examStatusHTML(course) +
       '<div class="code">'+esc(academicBranchName(slip.branch))+'</div>' +
     '</div>' +
     '<div class="slip-body">' +
@@ -803,13 +819,13 @@ function coursesTabHTML(){
     var checked = !!S.courseBranchSel[b];
     return '<label class="chip'+(checked?' checked':'')+'"><input type="checkbox" '+(checked?'checked':'')+' onchange="App.toggleCourseBranch(&#39;'+b+'&#39;)"> '+esc(branch.code)+'</label>';
   }).join('');
-  var years = allBatchYears();
+  var years = allBatchYears().filter(function(year){ return year!=='20' && year!=='21' && year!=='22'; });
   if(years.indexOf(S.courseForm.year)===-1) S.courseForm.year = years[0];
   var yearOpts = years.map(function(y){ return '<option value="'+y+'"'+(y===S.courseForm.year?' selected':'')+'>Batch of 20'+y+' (year code '+y+')</option>'; }).join('');
 
-  var list = COURSES.length ? '<div class="table-scroll"><table><thead><tr><th>Code</th><th>Course</th><th>Batch</th><th>Branches</th><th>Date</th><th>Session</th><th>Time</th><th></th></tr></thead><tbody>' +
+  var list = COURSES.length ? '<div class="table-scroll"><table><thead><tr><th>Code</th><th>Course</th><th>Batch</th><th>Branches</th><th>Date</th><th>Session</th><th>Time</th><th>Status</th><th></th></tr></thead><tbody>' +
     COURSES.map(function(c){
-      return '<tr><td class="mono">'+esc(c.code)+'</td><td>'+esc(c.name)+'</td><td class="mono">20'+esc(c.year)+'</td><td>'+esc(c.branches.join(', '))+'</td><td>'+esc(c.date||'—')+'</td><td>'+esc(sessionLabel(c.session))+'</td><td class="mono">'+esc(formatTime12(c.time)||'—')+'</td>' +
+      return '<tr><td class="mono">'+esc(c.code)+'</td><td>'+esc(c.name)+'</td><td class="mono">20'+esc(c.year)+'</td><td>'+esc(c.branches.join(', '))+'</td><td>'+esc(c.date||'—')+'</td><td>'+esc(sessionLabel(c.session))+'</td><td class="mono">'+esc(formatTime12(c.time)||'—')+'</td><td>'+examStatusHTML(c)+'</td>' +
         '<td><button class="btn btn-danger btn-sm" onclick="App.deleteCourse(&#39;'+c.id+'&#39;)">Delete</button></td></tr>';
     }).join('') + '</tbody></table></div>'
     : '<div class="empty-block"><div class="big">No courses yet</div><p>Add a course below to make it selectable for seating.</p></div>';
@@ -1486,6 +1502,9 @@ window.App = App;
 /* ---------------- boot ---------------- */
 loadAll().then(function(){ return refreshAssignCache(); }).then(render);
 render();
+setInterval(function(){
+  if(S.screen==='studentResult') render();
+}, 60000);
 
 })();
 </script>
